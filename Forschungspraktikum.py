@@ -111,6 +111,20 @@ def volt_ds_new(U_th, K, U):
     res = (K*U_th-1+math.sqrt((K*U_th-1)**2-(2*K*((K/2)*U_th**2-U))))/K
     return res
 
+def volt_ds_new_with_gate(U_gs, U_th, K, U):
+    if U_gs<U_th:
+        return U
+
+    if (K*(U_gs-U_th)+1)**2-(2*K*U) < 0:
+        res = U - (K/2)*(U_gs-U_th)**2
+    else:
+        res = (-K*(U_gs-U_th)-1+math.sqrt((K*(U_gs-U_th)+1)**2-(2*K*U)))/-K
+
+    if res >= U_gs - U_th:
+        res = U - (K/2)*(U_gs-U_th)**2
+
+    return res
+
 def volt_mosfet():
     R = 1000
     beta_BSS183W = 0.08
@@ -182,6 +196,142 @@ def volt_mosfet():
     plt.show()
 
 
+def volt_mosfet_gate_control():
+    R = 1000
+    beta_BSS183W = 0.08
+    beta_ALD212900A = 0.01
+    K_BSS183W = R*beta_BSS183W
+    K_ALD212900A = R*beta_ALD212900A
+
+    volt_step = 0.1  # V
+    N = 30
+
+    volt_vec = np.linspace(0.1, N * volt_step, N+1)
+
+    U_th_BSS183W = 1.3
+    U_th_ALD212900A = 0
+
+    u_ds_vec_BSS183W = []
+    eff_vec_BSS183W = []
+    u_ds_vec_ALD212900A = []
+    eff_vec_ALD212900A = []
+
+    u_ds_vec_BSS183W_vec = []
+    eff_vec_BSS183W_vec = []
+    u_ds_vec_ALD212900A_vec = []
+    eff_vec_ALD212900A_vec = []
+
+    u_ds_vec_temp = []
+
+    U_gs = 1.6
+
+    U_gs_vector_ALD212900A = [0.5,1.5,2.5]
+    U_gs_vector_BSS183W = [0.5,1.5,2.5]
+
+    for u_gs in U_gs_vector_BSS183W:
+        for v in volt_vec:
+            u_ds_vec_BSS183W.append(v-volt_ds_new_with_gate(u_gs, U_th_BSS183W,K_BSS183W,v))
+            eff_vec_BSS183W.append(1-volt_ds_new_with_gate(u_gs, U_th_BSS183W, K_BSS183W, v)/v)
+        u_ds_vec_BSS183W_vec.append(u_ds_vec_BSS183W)
+        u_ds_vec_BSS183W = []
+        eff_vec_BSS183W_vec.append(eff_vec_BSS183W)
+        eff_vec_BSS183W = []
+
+    for u_gs in U_gs_vector_ALD212900A:
+        for v in volt_vec:
+            u_ds_vec_ALD212900A.append(v-volt_ds_new_with_gate(u_gs, U_th_ALD212900A, K_ALD212900A, v))
+            eff_vec_ALD212900A.append(1 - volt_ds_new_with_gate(u_gs, U_th_ALD212900A, K_ALD212900A, v) / v)
+        u_ds_vec_ALD212900A_vec.append(u_ds_vec_ALD212900A)
+        u_ds_vec_ALD212900A = []
+        eff_vec_ALD212900A_vec.append(eff_vec_ALD212900A)
+        eff_vec_ALD212900A = []
+
+
+    plt.rcParams.update({
+        "font.family": "sans-serif",
+        "font.sans-serif": "arial",
+        "font.size": 16
+    })
+
+    def format_with_comma(x, pos):
+        return f"{x:.1f}".replace(".", ",")
+
+    fig, axes = plt.subplots(1, 2)
+
+    linestyles = ["-.", "--", "-"]
+
+    for i in range(len(U_gs_vector_BSS183W)):
+        axes[0].plot(volt_vec, u_ds_vec_BSS183W_vec[i], color="tab:blue", linestyle=linestyles[i])
+        axes[0].plot(volt_vec, u_ds_vec_ALD212900A_vec[i], color="tab:orange", linestyle=linestyles[i])
+
+    for i in range(len(U_gs_vector_BSS183W)):
+        axes[1].plot(volt_vec, eff_vec_BSS183W_vec[i], color="tab:blue", linestyle=linestyles[i])
+        axes[1].plot(volt_vec, eff_vec_ALD212900A_vec[i], color="tab:orange", linestyle=linestyles[i])
+
+
+    axes[0].set_xlabel(r"Spannung $U$ / V")
+    axes[0].set_ylabel(r"Spannung $U_{R}$ / V")
+    axes[0].legend([r"BSS, $U_{GS}$ = 0,5 V", r"ALD, $U_{GS}$ = 0,5 V", r"BSS, $U_{GS}$ = 1,5 V",
+                    r"ALD, $U_{GS}$ = 1,5 V", r"BSS, $U_{GS}$ = 2,5 V", r"ALD, $U_{GS}$ = 2,5 V"], loc="upper left")
+
+    axes[1].set_xlabel(r"Spannung $U$ / V")
+    axes[1].set_ylabel(r"Wirkungsgrad η")
+    axes[1].legend([r"BSS183W", r"ALD212900A"], loc="lower right")
+
+    axes[0].grid(True)
+    axes[1].grid(True)
+    # plt.minorticks_on()
+    # plt.grid(True, which='minor',linestyle=":", linewidth=0.5)
+
+    # ax.set_xlim(18, 60)
+    # ax.set_ylim(0, 6)
+
+    #axes[0].yaxis.set_major_formatter(FuncFormatter(format_with_comma))
+    axes[1].yaxis.set_major_formatter(FuncFormatter(format_with_comma))
+
+    plt.show()
+
+    # ----------------------------------------Doppelt--------------------------------------------------------------
+
+    fig, axes = plt.subplots(2, 2)
+
+    linestyles = ["-.", "--", "-"]
+
+    for i in range(len(U_gs_vector_BSS183W)):
+        axes[1,0].plot(volt_vec, u_ds_vec_BSS183W_vec[i], color="tab:blue", linestyle=linestyles[i])
+        axes[0,0].plot(volt_vec, u_ds_vec_ALD212900A_vec[i], color="tab:orange", linestyle=linestyles[i])
+
+    for i in range(len(U_gs_vector_BSS183W)):
+        axes[1,1].plot(volt_vec, eff_vec_BSS183W_vec[i], color="tab:blue", linestyle=linestyles[i])
+        axes[0,1].plot(volt_vec, eff_vec_ALD212900A_vec[i], color="tab:orange", linestyle=linestyles[i])
+
+    axes[0,0].set_xlabel(r"Spannung $U$ / V")
+    axes[0,0].set_ylabel(r"Spannung $U_{R}$ / V")
+    axes[1, 0].set_xlabel(r"Spannung $U$ / V")
+    axes[1, 0].set_ylabel(r"Spannung $U_{R}$ / V")
+    axes[0,0].legend([r"ALD, $U_{GS}$ = 0,5 V", r"ALD, $U_{GS}$ = 1,5 V", r"ALD, $U_{GS}$ = 2,5 V"], loc="upper left")
+
+    axes[0,1].set_xlabel(r"Spannung $U$ / V")
+    axes[0,1].set_ylabel(r"Wirkungsgrad η")
+    axes[1, 1].set_xlabel(r"Spannung $U$ / V")
+    axes[1, 1].set_ylabel(r"Wirkungsgrad η")
+    axes[1,0].legend([r"BSS, $U_{GS}$ = 0,5 V", r"BSS, $U_{GS}$ = 1,5 V", r"BSS, $U_{GS}$ = 2,5 V"], loc="upper left")
+
+    axes[0,0].grid(True)
+    axes[0,1].grid(True)
+    axes[1, 0].grid(True)
+    axes[1, 1].grid(True)
+    # plt.minorticks_on()
+    # plt.grid(True, which='minor',linestyle=":", linewidth=0.5)
+
+    # ax.set_xlim(18, 60)
+    # ax.set_ylim(0, 6)
+
+    axes[1,1].yaxis.set_major_formatter(FuncFormatter(format_with_comma))
+    axes[0,1].yaxis.set_major_formatter(FuncFormatter(format_with_comma))
+
+    plt.show()
+
 def draw_mosfet_v_diode():
     u_BSS183W = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.03706108990670742, 0.11206873835848863, 0.19303201844622708, 0.2768117039549782, 0.36232572266321217, 0.44904642259517935, 0.5366693723228955, 0.6250000000000013, 0.713904996663131, 0.8032882948670894, 0.8930779508528879, 0.9832184298276989, 1.0736658002541775, 1.164384599227701, 1.2553457092496991, 1.3465248740273403, 1.4379016328616196, 1.529458537786335, 1.6211805668326666, 1.7130546765137162, 1.8050694551644897, 1.8972148506742132, 1.9894819539822906, 2.0818628249833377, 2.1743503511095534, 2.2669381313926644, 2.359620380609572, 2.4523918494164403]
     eff_BSS183W = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.027101345452802517, 0.07649743232661343, 0.12354049180558535, 0.16675403852709525, 0.20615972840012076, 0.24207354317799423, 0.27486267468522174, 0.3048780487804884, 0.3324353884345197, 0.357812158069973, 0.38124992565758287, 0.40295837288020453, 0.42311952719376456, 0.44189168851146143, 0.45941288536128044, 0.47580384241248774, 0.4911704979885976, 0.5056061281938298, 0.5191931358951695, 0.5320045579235143, 0.54410533689962, 0.5555533969763435, 0.5664005562938905, 0.5766933033194841, 0.5864734595035882, 0.5957787467523428, 0.6046432749800312, 0.6130979623541101]
@@ -245,4 +395,4 @@ def draw_mosfet_v_diode():
 
 
 if __name__ == "__main__":
-    draw_mosfet_v_diode()
+    volt_mosfet_gate_control()
