@@ -203,10 +203,10 @@ def volt_mosfet_gate_control():
     K_BSS183W = R*beta_BSS183W
     K_ALD212900A = R*beta_ALD212900A
 
-    volt_step = 0.1  # V
-    N = 30
+    volt_step = 0.01  # V
+    N = 300
 
-    volt_vec = np.linspace(0.1, N * volt_step, N+1)
+    volt_vec = np.linspace(0.01, N * volt_step, N+1)
 
     U_th_BSS183W = 1.3
     U_th_ALD212900A = 0
