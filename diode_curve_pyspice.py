@@ -15,10 +15,10 @@ from matplotlib.ticker import EngFormatter
 
 I_S = 266e-6
 N = 1.51
-Imax = 1
-Imin = 0.01
-Vinputmax = 1
-Vinputmin = 0
+Imax = 0.10
+Imin = 0
+Vinputmax = 1.0
+Vinputmin = 0.0
 
 diodes = {"CDBZC0140L": [1.0e-6, 1.27, 40],
           "1SS422": [1.13e-6, 1.07, 30],
@@ -31,9 +31,15 @@ diodes = {"CDBZC0140L": [1.0e-6, 1.27, 40],
           "BAT54W-G": [9.77e-8, 1.12, 30],
           "1N4002": [4.12e-10, 1.72, 100]}
 
-#diodes = {"MBR30H30CTG": [167e-6, 1.4, 30]}
+diodes = {"1SS406": [3.89e-9, 1.06, 20]}
 
+plt.rcParams.update({
+    "font.family": "sans-serif",
+    "font.sans-serif": "arial",
+    "font.size": 16
+})
 
+fig, ax = plt.subplots()
 
 for key in diodes:
     circuit = Circuit(key)
@@ -56,12 +62,32 @@ for key in diodes:
 
     #i_d = I_S * (np.exp(analysis.out / (N * ((Tnom + 273) * 1.380649e-23 / 1.602176634e-19))) - 1)
 
-    plt.plot(analysis.out, -analysis.Vinput)
+    ax.plot(analysis.out, -analysis.Vinput)
     #plt.semilogy(analysis.out, -analysis.Vinput)
     #plt.semilogy(analysis.out, i_d, 'black')
 
-plt.xlim(Vinputmin, Vinputmax)
-plt.ylim(Imin, Imax)
-plt.grid()
-plt.legend(list(diodes.keys()))
+
+def format_with_comma_x(x, pos):
+    return f"{x:.1f}".replace(".", ",")
+
+def format_with_comma_y(x, pos):
+    return f"{x:.2f}".replace(".", ",")
+
+ax.set_xlim(Vinputmin, Vinputmax)
+ax.set_ylim(Imin, Imax)
+ax.grid()
+#ax.legend(list(diodes.keys()))
+ax.set_ylabel(r"Strom $I$ / A")
+ax.set_xlabel(r"Spannung $U$ / V")
+#ax.plot(real_t, mean_2_vec, linestyle="--")
+#ax.plot(real_t, mean_1_vec, linestyle="-.")
+
+#plt.grid(True)
+#plt.minorticks_on()
+#plt.grid(True, which='minor',linestyle=":", linewidth=0.5)
+
+
+ax.xaxis.set_major_formatter(ticker.FuncFormatter(format_with_comma_x))
+ax.yaxis.set_major_formatter(ticker.FuncFormatter(format_with_comma_y))
+
 plt.show()
