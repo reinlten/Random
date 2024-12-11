@@ -57,7 +57,7 @@ for key in diodes:
     circuit.D('D3', 'output_minus', circuit.gnd, model=key)
     circuit.D('D4', circuit.gnd, 'output_plus', model=key)
     circuit.D('D1', 'output_minus', 'out_in', model=key)
-    circuit.C('C1', 'output_plus', 'output_minus', 100@u_uF)
+    circuit.C('C1', 'output_plus', 'output_minus', 10@u_uF)
 
     simulator = circuit.simulator(temperature=25, nominal_temperature=25)
     analysis = simulator.transient(step_time=source.period/200, end_time=source.period*10)
@@ -83,10 +83,10 @@ for key in diodes:
     times[key] = np.array(time)
 
     if not draw_input_voltage_flag:
-        plt.plot(time, voltage_in)
+        #ax.plot(time, voltage_in)
         draw_input_voltage_flag = True
 
-    ax.plot(time, voltage_out)
+    ax.plot(time, current)
 
 
 def format_with_comma(x, pos):

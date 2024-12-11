@@ -16,9 +16,9 @@ from matplotlib.ticker import EngFormatter
 I_S = 266e-6
 N = 1.51
 Imax = 0.10
-Imin = 0
-Vinputmax = 1.0
-Vinputmin = 0.0
+Imin = -0.1
+Vinputmax = 1.5
+Vinputmin = -2.0
 
 diodes = {"CDBZC0140L": [1.0e-6, 1.27, 40],
           "1SS422": [1.13e-6, 1.07, 30],
@@ -31,7 +31,7 @@ diodes = {"CDBZC0140L": [1.0e-6, 1.27, 40],
           "BAT54W-G": [9.77e-8, 1.12, 30],
           "1N4002": [4.12e-10, 1.72, 100]}
 
-diodes = {"1SS406": [3.89e-9, 1.06, 20]}
+#diodes = {"1SS406": [3.89e-9, 1.06, 20]}
 
 plt.rcParams.update({
     "font.family": "sans-serif",
@@ -76,7 +76,7 @@ def format_with_comma_y(x, pos):
 ax.set_xlim(Vinputmin, Vinputmax)
 ax.set_ylim(Imin, Imax)
 ax.grid()
-#ax.legend(list(diodes.keys()))
+#ax.legend(list(diodes.keys()),loc="lower right")
 ax.set_ylabel(r"Strom $I$ / A")
 ax.set_xlabel(r"Spannung $U$ / V")
 #ax.plot(real_t, mean_2_vec, linestyle="--")
@@ -87,7 +87,7 @@ ax.set_xlabel(r"Spannung $U$ / V")
 #plt.grid(True, which='minor',linestyle=":", linewidth=0.5)
 
 
-ax.xaxis.set_major_formatter(ticker.FuncFormatter(format_with_comma_x))
-ax.yaxis.set_major_formatter(ticker.FuncFormatter(format_with_comma_y))
+#ax.xaxis.set_major_formatter(ticker.FuncFormatter(format_with_comma_x))
+#ax.yaxis.set_major_formatter(ticker.FuncFormatter(format_with_comma_y))
 
 plt.show()
