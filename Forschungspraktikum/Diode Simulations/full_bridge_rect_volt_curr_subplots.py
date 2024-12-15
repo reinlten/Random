@@ -26,7 +26,7 @@ diodes = {"CDBZC0140L": [1.0e-6, 1.27, 40],
           "BAT54W-G": [9.77e-8, 1.12, 30],
           "1N4002": [4.12e-10, 1.72, 100]}
 
-#diodes = {"1SS406": [3.89e-9, 1.06, 20]}
+diodes = {"1SS406": [3.89e-9, 1.06, 20]}
 
 R_sys = 2000  # Ohm
 R_in = 40  # Ohm
@@ -68,7 +68,7 @@ for key in diodes:
     circuit.C('C1', 'output_plus', 'output_minus', C_DC@u_uF)
 
     simulator = circuit.simulator(temperature=25, nominal_temperature=25)
-    analysis = simulator.transient(step_time=source.period/200, end_time=source.period*1000)
+    analysis = simulator.transient(step_time=source.period/200, end_time=source.period*5)
 
     voltage_in = []
     voltage_out = []
@@ -77,11 +77,11 @@ for key in diodes:
 
     current = []
 
-    for i in range(len(analysis.nodes["in"])):
-        voltage_in.append(analysis.nodes["in"][i].value)
+    for i in range(len(analysis.nodes["out_in"])):
+        voltage_in.append(analysis.nodes["out_in"][i].value)
         voltage_out.append(analysis.nodes["output_plus"][i].value-analysis.nodes["output_minus"][i].value)
         voltage_out_squared.append((analysis.nodes["output_plus"][i].value-analysis.nodes["output_minus"][i].value)**2)
-        current.append(analysis.branches["vinput"][i].value)  # current is then in mA (but eff. calc is then wrong!)
+        current.append(analysis.branches["vinput"][i].value*1000)  # current is then in mA (but eff. calc is then wrong!)
 
     voltages_out[key] = np.array(voltage_out)
     voltages_out_squared[key] = np.array(voltage_out_squared)
@@ -94,26 +94,26 @@ for key in diodes:
     times[key] = np.array(time)
 
     if not draw_input_voltage_flag:
-        #ax[0].plot(time, voltage_in)
+        ax[0].plot(time, voltage_in)
         draw_input_voltage_flag = True
 
     ax[0].plot(time, voltage_out)
     ax[1].plot(time, current)
-    #ax[1].plot(times[key], 1000*voltages_out[key]/R_sys)
+    ax[1].plot(times[key], 1000*voltages_out[key]/R_sys)
 
 
 def format_with_comma(x, pos):
     return f"{x:.2f}".replace(".", ",")
 
 
-ax[0].legend(list(diodes.keys()),loc="lower right")
+#ax[0].legend(list(diodes.keys()),loc="lower right")
 #ax[0].legend(['$U_{in}$']+list(diodes.keys()),loc="lower right")
-#ax[0].legend(['$U_{in}$','$U_{sys}$'],loc="lower right")
+ax[0].legend(['$U_{in}$','$U_{sys}$'],loc="lower right")
 ax[0].grid()
 ax[0].set_xlabel(r"Zeit $t$ / ms")
 ax[0].set_ylabel(r"Spannung $U$ / V")
 #ax.xaxis.set_major_formatter(ticker.FuncFormatter(format_with_comma))
-#ax[1].legend(['$I_{in}$','$I_{sys}$'],loc="lower right")
+ax[1].legend(['$I_{in}$','$I_{sys}$'],loc="lower right")
 #ax[1].legend(list(diodes.keys()),loc="lower right")
 ax[1].grid()
 ax[1].set_xlabel(r"Zeit $t$ / ms")

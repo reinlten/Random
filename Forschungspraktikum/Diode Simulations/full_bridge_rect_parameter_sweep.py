@@ -32,7 +32,7 @@ diodes = {"CDBZC0140L": [1.0e-6, 1.27, 40, 0.004],
 R_sys_vec = [50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000, 50000, 100000, 200000, 500000, 1000000]
 R_in_vec = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000]
 V_in_vec = [0.5, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
-C_DC_vec = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000]
+C_DC_vec = [1, 2, 5, 10, 20, 50, 100, 200, 500] #,# 1000, 2000, 5000, 10000]
 
 whole_vec = [V_in_vec, C_DC_vec, R_sys_vec, R_in_vec]
 
@@ -90,7 +90,7 @@ for k in range(len(whole_vec)):
 
         for key in diodes:
 
-            circuit = Circuit(key)
+            circuit = Circuit(key + " " + str(k))
 
             circuit.model(key, 'D', IS=diodes[key][0], N=diodes[key][1], BV=diodes[key][2])
             source = circuit.SinusoidalVoltageSource('input', 'in_in', circuit.gnd, amplitude=V_in, frequency=freq)
@@ -103,7 +103,7 @@ for k in range(len(whole_vec)):
             circuit.C('C1', 'output_plus', 'output_minus', C_DC @ u_uF)
 
             simulator = circuit.simulator(temperature=25, nominal_temperature=25)
-            analysis = simulator.transient(step_time=source.period / 200, end_time=source.period * 5)
+            analysis = simulator.transient(step_time=source.period / 200, end_time=source.period * 500)
 
             voltage_in = []
             voltage_out = []
@@ -112,8 +112,8 @@ for k in range(len(whole_vec)):
 
             current = []
 
-            for i in range(len(analysis.nodes["in_in"])):
-                voltage_in.append(analysis.nodes["in_in"][i].value)
+            for i in range(len(analysis.nodes["out_in"])):
+                voltage_in.append(analysis.nodes["out_in"][i].value)
                 voltage_out.append(analysis.nodes["output_plus"][i].value - analysis.nodes["output_minus"][i].value)
                 voltage_out_squared.append(
                     (analysis.nodes["output_plus"][i].value - analysis.nodes["output_minus"][i].value) ** 2)
@@ -154,7 +154,7 @@ for k in range(len(whole_vec)):
         for key in diodes:
             # print(f"Efficiency for key (with R and C) {key}: {P_out[key]*100/P_in[key]}%")
             print(f"{key}: {P_out_voltage[key] * 100 / (P_in[key] * R_sys)}%")
-            if max(total_currents[key]) < diodes[key][3]:
+            if max(abs(total_currents[key][500:])) < diodes[key][3]:
                 efficiency_vec[key][1].append(P_out_voltage[key] * 100 / (P_in[key] * R_sys))
                 efficiency_vec[key][0].append(whole_vec[k][l])
         print()
@@ -165,7 +165,7 @@ for k in range(len(whole_vec)):
         else:
             ax[int(k / 2)][k % 2].plot(efficiency_vec[key][0], efficiency_vec[key][1])
 
-    ax[0][0].legend(list(diodes.keys()), loc="lower right")
+    #ax[0][0].legend(list(diodes.keys()), loc="lower right")
     # ax[0].legend(['$U_{in}$']+list(diodes.keys()),loc="lower right")
     # ax[0].legend(['$U_{in}$','$U_{sys}$'],loc="lower right")
     ax[int(k / 2)][k % 2].grid()
