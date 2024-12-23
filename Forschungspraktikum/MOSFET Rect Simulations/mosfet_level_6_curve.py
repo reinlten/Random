@@ -13,20 +13,22 @@ from PySpice.Spice.Netlist import Circuit
 from PySpice.Unit import *
 from matplotlib.ticker import EngFormatter
 
-Imax = 100e-3
+
+
+mosfets = {'ALD212900':{'type':'NMOS', 'vt0':-1.1745778150460267, 'kv':0.20176976812623407, 'nv':1.8374679108984806, 'kc':0.0029299072844733392, 'nc':2.3575178901305347, 'lambda0':0.018518518518518545},
+           'BSS138W':{'type':'NMOS', 'vt0':1.4437439206663292, 'kv':1.3081378168176439, 'nv':0.46214435120124614, 'kc':0.17827347479335037, 'nc':1.5048548264744104, 'lambda0':0.004739336492890999},
+           'SI3134K':{'type':'NMOS', 'vt0':1.260478867919, 'kv':2.7565667158079497, 'nv':0.2219528830090265, 'kc':2.600527739914404, 'nc':0.6148403669736079, 'lambda0':0.03146374829001374}}
+
+mosfets = {'SI3134K':{'type':'NMOS', 'vt0':1.260478867919, 'kv':2.7565667158079497, 'nv':0.2219528830090265, 'kc':2.600527739914404, 'nc':0.6148403669736079, 'lambda0':0.03146374829001374}}
+
+gate_voltage = 2
+gate_step = 1
+steps = 3
+
+Imax = 5
 Imin = 0
-Vinputmax = 10
+Vinputmax = 5
 Vinputmin = 0
-
-mosfets = {'BSS183W': ['NMOS', 0.20078461, 1.2, 0.00400083],
-           'ALD202900': ['NMOS', 0.0183, 0.0, 0.0163],
-           'DMN3270UVT': ['NMOS', 1.20572210, 0.6, 0.0001]}
-
-mosfets = {'ALD202900': ['NMOS', 0.0183, 0.0, 0.0163]}
-
-gate_voltage = 0.5
-gate_step = 0.5
-steps = 6
 
 plt.rcParams.update({
     "font.family": "sans-serif",
@@ -41,8 +43,7 @@ for i in range(steps):
         print(f"gate Voltage: {gate_voltage+i*gate_step}")
         circuit = Circuit(mos)
 
-        circuit.model(mos, mosfets[mos][0], KP=mosfets[mos][1], VTO=mosfets[mos][2], LAMBDA=mosfets[mos][3])
-
+        circuit.model(mos, mosfets[mos]['type'], LEVEL=6, vt0=mosfets[mos]['vt0'], kv=mosfets[mos]['kv'], nv=mosfets[mos]['nv'], kc=mosfets[mos]['kc'], nc=mosfets[mos]['nc'], lambda0=mosfets[mos]['lambda0'])
         Vinput = circuit.V('input', 'drain', circuit.gnd, 1 @ u_V)
         Vgate = circuit.V('input_gate', 'gate', circuit.gnd,(gate_voltage+i*gate_step) @ u_V)
         circuit.MOSFET("MOS1", 'drain', 'gate', circuit.gnd, circuit.gnd, model=mos)
@@ -86,17 +87,17 @@ plt.show()
 
 fig, ax = plt.subplots()
 
-drain_voltage = 5
+drain_voltage = 3
 
-Imax = 100e-3
+Imax = 4
 Imin = 0
-Vinputmax = 8
-Vinputmin = -4
+Vinputmax = 4
+Vinputmin = 0
 
 for mos in mosfets:
     circuit = Circuit(mos)
 
-    circuit.model(mos, mosfets[mos][0], KP=mosfets[mos][1], VTO=mosfets[mos][2], LAMBDA=mosfets[mos][3])
+    circuit.model(mos, mosfets[mos]['type'], LEVEL=6, vt0=mosfets[mos]['vt0'], kv=mosfets[mos]['kv'], nv=mosfets[mos]['nv'], kc=mosfets[mos]['kc'], nc=mosfets[mos]['nc'], lambda0=mosfets[mos]['lambda0'])
 
     Vinput = circuit.V('input', 'drain', circuit.gnd, drain_voltage @ u_V)
     Vinput_gate = circuit.V('input_gate', 'gate', circuit.gnd, 1 @ u_V)
