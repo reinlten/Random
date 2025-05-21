@@ -186,4 +186,3 @@ for k in range(len(whole_vec)):
 
     # plt.subplots_adjust(top=0.88, bottom=0.16, left=0.18, right=0.9, hspace=0.2, wspace=0.22)
 
-plt.show()
