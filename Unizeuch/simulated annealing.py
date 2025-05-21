@@ -24,22 +24,22 @@ for k in range(k_max):
     E_a = 0
 
     for j in range(len(W[i])):
-        E_a += -0.5*W[i][j]*s[i]*s[j]
+        E_a += -0.5 * W[i][j] * s[i] * s[j]
 
     E_b = -E_a
     if E_b < E_a:
         s[i] = -s[i]
     else:
-        if np.exp(-(E_b-E_a)/T) > np.random.rand(1):
+        if np.exp(-(E_b - E_a) / T) > np.random.rand(1):
             s[i] = -s[i]
 
     T_vec_1.append(T)
-    E_vec_1.append(-0.5*np.dot(np.dot(s, W), s.T))
+    E_vec_1.append(-0.5 * np.dot(np.dot(s, W), s.T))
     k_vec_1.append(k)
 
-    T = c*T
+    T = c * T
 
-
+print(s)
 
 # deterministic
 
@@ -50,7 +50,7 @@ W = np.array([[0, 7, -3, 5, 5, 1],
               [5, -3, 2, 3, 0, 7],
               [1, 1, 0, -3, 7, 0]])
 
-s = np.array([1., -1., -1., 1., -1., 1.]).T
+s = np.array([1., -1., -1., 1., -1., 1.])
 
 T = 10
 T_vec_2 = []
@@ -60,14 +60,15 @@ k_vec_2 = []
 for k in range(k_max):
     for i in range(len(s)):
         l = np.dot(W[i], s.T)
-        s[i] = np.tanh(l/T)
+        s[i] = np.tanh(l / T)
 
     T_vec_2.append(T)
     E_vec_2.append(-0.5 * np.dot(np.dot(s, W), s.T))
     k_vec_2.append(k)
 
-    T = c*T
+    T = c * T
 
+print(s)
 
 # Erstellung der Subplots nebeneinander
 fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 6))
