@@ -2,8 +2,8 @@ import matplotlib.pyplot as plt
 import os
 
 # Parameter
-dateien = ['10ml_1A_alu_no_paste.txt', '10ml_2A_alu_no_paste.txt', '10ml_3A_alu_no_paste.txt', '10ml_4A_alu_no_paste.txt']  # Deine Dateien hier eintragen
-wasser_ml = 10  # ml Wasser
+dateien = ['20ml_2A_water.txt','20ml_3A_water.txt','20ml_4A_water.txt']  # Deine Dateien hier eintragen
+wasser_ml = 20  # ml Wasser
 c_wasser = 4186  # J/(kg·K)
 m_wasser = wasser_ml / 1000  # kg
 intervall_s = 10

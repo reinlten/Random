@@ -1,11 +1,11 @@
 import matplotlib.pyplot as plt
 
 # Parameter
-dateiname = '10ml_4A_alu_no_paste.txt'
-wasser_ml = 10  # Wassermenge in ml
+dateiname = '20ml_2A_water.txt'
+wasser_ml = 20  # Wassermenge in ml
 c_wasser = 4186  # J/(kg·K)
 m_wasser = wasser_ml / 1000  # in kg
-intervall_s = 10
+intervall_s = 20
 abstand_zwischen_messungen_s = 0.5
 messungen_pro_intervall = int(intervall_s / abstand_zwischen_messungen_s)
 
