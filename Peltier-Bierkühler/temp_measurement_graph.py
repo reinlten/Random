@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 
 # Parameter
-dateiname = '20ml_2A_water.txt'
+dateiname = '20ml_4A_water.txt'
 wasser_ml = 20  # Wassermenge in ml
 c_wasser = 4186  # J/(kg·K)
 m_wasser = wasser_ml / 1000  # in kg

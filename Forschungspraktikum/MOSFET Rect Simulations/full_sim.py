@@ -19,22 +19,27 @@ from scipy import integrate
 class OperationalAmplifier(SubCircuit):
     __nodes__ = ('non_inv_in', "inv_in", "v_pos", "v_neg", "out")
 
-    def __init__(self, name, K=10000, v_pos_swing=0.0 @ u_V, v_neg_swing=0 @ u_V):
+    def __init__(self, name, K=20000, v_pos_swing=0.0 @ u_V, v_neg_swing=0 @ u_V, v_offset=0 @ u_V, min_supply_v=0@u_V):
         SubCircuit.__init__(self, name, *self.__nodes__)
 
-        self.model("SW1", "SW", Ron=1 @ u_Ohm, Roff=1 @ u_MOhm, Vt=0.0 @ u_V)
+        self.model("SW1", "SW", Ron=1 @ u_Ohm, Roff=1 @ u_TOhm, Vt=0.0 @ u_V)
 
-        self.VCVS(1, "amp", circuit.gnd, "non_inv_in", "inv_in", voltage_gain=K)
-        self.S(1, "out", "pos_swing", "amp", "v_pos", model="SW1")
-        self.S(2, "sw_conn", "amp", "v_pos", "amp", model="SW1")
-        self.S(3, "out", "sw_conn", "amp", "neg_swing", model="SW1")
-        self.S(4, "out", "neg_swing", "neg_swing", "amp", model="SW1")
-        self.V(1, "v_pos", "pos_swing", v_pos_swing @ u_V)
-        self.V(2, "neg_swing", "v_neg", v_neg_swing @ u_V)
+        self.VCVS(1, "amp", self.gnd, "offset_out", "inv_in", voltage_gain=K)
+        self.S(1, 1, "pos_swing", "amp", "pos_swing", model="SW1")
+        self.S(2, "sw_conn", "amp", "pos_swing", "amp", model="SW1")
+        self.S(3, 1, "sw_conn", "amp", "neg_swing", model="SW1")
+        self.S(4, 1, "neg_swing", "neg_swing", "amp", model="SW1")
+        self.S(5, 2, 1, "v_pos", 3, model="SW1")
+        self.S(6, self.gnd, 2, 3, 'v_pos', model="SW1")
+        self.V(1, "v_pos", "pos_swing", v_pos_swing)
+        self.V(2, "neg_swing", "v_neg", v_neg_swing)
+        self.V(3, "non_inv_in", "offset_out", v_offset)
+        self.V(4, 3, self.gnd, min_supply_v)
+        self.R(1, "out", 2, 20 @ u_Ohm)
 
 
 class CascadeWithDiodes(SubCircuit):
-    __nodes__ = ('v_in', 'v_pos_out', 'v_neg_out')
+    __nodes__ = ('v_in', 'cascade_pos_out', 'cascade_neg_out')
 
     def __init__(self, name, diode='1SS422', c_cascade=4.7 @ u_uF):
         SubCircuit.__init__(self, name, *self.__nodes__)
@@ -114,10 +119,10 @@ R_in_vec = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000]
 V_in_vec = [0.5, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
 C_DC_vec = [1, 2, 5, 10, 20, 50, 100, 200, 500]  # ,# 1000, 2000, 5000, 10000]
 
-R_in = 50  # Ohm
-R_sys = 100000
-V_in = 2  # V
-freq = 50  # Hz
+R_in = 20  # Ohm
+R_sys = 1000000
+V_in = 1 @ u_V # V
+freq = 50 @ u_Hz  # Hz
 C_DC = 4.7  # µF
 c_ext = 4.7
 c_buf = 1
@@ -133,39 +138,48 @@ for diode in diodes:
 
         source = circuit.SinusoidalVoltageSource('input', 'v_in', circuit.gnd, amplitude=V_in, frequency=freq)
 
-        circuit.subcircuit(OperationalAmplifier("amp", K=2000, v_pos_swing=0.0@u_V, v_neg_swing=0.0@u_V))
-        circuit.subcircuit(CascadeWithDiodes("cascade", diode=diode, c_cascade=4.7@u_uF))
+        circuit.subcircuit(OperationalAmplifier("amp", K=10000, v_pos_swing=0.15@u_V, v_neg_swing=0.15@u_V,
+                                                v_offset=5 @ u_mV, min_supply_v=0.7 @ u_V))
+        circuit.subcircuit(CascadeWithDiodes("cascade", diode=diode, c_cascade=4.7@u_µF))
         circuit.model(mos, mosfets[mos]['type'], LEVEL=6, vt0=mosfets[mos]['vt0'], kv=mosfets[mos]['kv'],
                       nv=mosfets[mos]['nv'], kc=mosfets[mos]['kc'], nc=mosfets[mos]['nc'],
                       lambda0=mosfets[mos]['lambda0'])
 
-        circuit.R('R_in', 'v_in', 'v_out_r', R_in @ u_Ω)
+        circuit.R('R_in', 'v_in', 'v_out_r', R_in @ u_Ohm)
         circuit.C('c_ext', 'v_out_r', 'c_ext_out', c_ext @ u_uF)
-        circuit.X(1, 'cascade', 'v_out_r', 'cascade_pos', 'cascade_neg')
-        circuit.X(2, 'amp', 'c_ext_out', circuit.gnd, 'cascade_pos', 'cascade_neg', 'op1_out')
-        circuit.X(3, 'amp', 'v_out', 'c_ext_out', 'cascade_pos', 'cascade_neg', 'op2_out')
+        circuit.X('casc', 'cascade', 'v_out_r', 'cascade_pos', 'cascade_neg')
+        circuit.X('amp1', 'amp', 'c_ext_out', circuit.gnd, 'cascade_pos', 'cascade_neg', 'op1_out')
+        circuit.X('amp2', 'amp', 'v_out', 'c_ext_out', 'cascade_pos', 'cascade_neg', 'op2_out')
         circuit.MOSFET(1, circuit.gnd, 'op1_out', 'c_ext_out', 'c_ext_out', model=mos)
         circuit.MOSFET(2, 'c_ext_out', 'op2_out', 'v_out', 'v_out', model=mos)
         circuit.C('c_buf', 'v_out', circuit.gnd, c_buf@u_uF)
         circuit.R('r_sys', 'v_out', circuit.gnd, R_sys@u_Ω)
 
         simulator = circuit.simulator(temperature=25, nominal_temperature=25)
-        analysis = simulator.transient(step_time=source.period / 200, end_time=source.period * 50)
+        analysis = simulator.transient(step_time=source.period / 200, end_time=0.061)
 
         if input_flag:
-            plt.plot(analysis.time, analysis.v_in)
-            plt.plot(analysis.time, analysis.cascade_pos)
-            plt.plot(analysis.time, analysis.cascade_neg)
+            #plt.plot(analysis.time, analysis.v_in)
+
+            #plt.plot(analysis.time, analysis['x1.cascade_neg_out'])
             input_flag = False
             legend.append('v_in')
             legend.append('cascade_pos')
-            legend.append('cascade_neg')
+            #legend.append('cascade_neg')
 
-
+        #plt.plot(analysis.time, analysis['x1.cascade_pos_out'])
+        plt.plot(analysis.time, analysis.v_in)
         plt.plot(analysis.time, analysis.v_out)
-        # plt.plot(analysis.time, analysis.cascade_neg_out)
+        plt.plot(analysis.time, analysis.op1_out)
+        plt.plot(analysis.time, analysis.op2_out)
+        plt.plot(analysis.time, analysis.c_ext_out)
 
-        legend.append(diode)
+
+        #plt.plot(analysis.time, analysis.branches['vinput'])
+
+        #legend.append(diode)
+        #legend.append(diode + ' v_out')
+        legend.append('current')
 
 plt.legend(legend)
 plt.show()
