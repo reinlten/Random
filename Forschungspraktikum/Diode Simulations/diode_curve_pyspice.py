@@ -76,7 +76,7 @@ def format_with_comma_y(x, pos):
 ax.set_xlim(Vinputmin, Vinputmax)
 ax.set_ylim(Imin, Imax)
 ax.grid()
-#ax.legend(list(diodes.keys()),loc="lower right")
+ax.legend(list(diodes.keys()),loc="lower right")
 ax.set_ylabel(r"Strom $I$ / A")
 ax.set_xlabel(r"Spannung $U$ / V")
 #ax.plot(real_t, mean_2_vec, linestyle="--")

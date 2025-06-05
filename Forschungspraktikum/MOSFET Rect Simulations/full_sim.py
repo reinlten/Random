@@ -136,10 +136,10 @@ for diode in diodes:
 
         circuit = Circuit(diode)
 
-        source = circuit.SinusoidalVoltageSource('input', 'v_in', circuit.gnd, amplitude=V_in, frequency=freq)
+        source = circuit.SinusoidalVoltageSource('input', 'v_in', circuit.gnd, amplitude=1, frequency=50)
 
         circuit.subcircuit(OperationalAmplifier("amp", K=10000, v_pos_swing=0.15@u_V, v_neg_swing=0.15@u_V,
-                                                v_offset=5 @ u_mV, min_supply_v=0.7 @ u_V))
+                                                v_offset=-5 @ u_mV, min_supply_v=0.7 @ u_V))
         circuit.subcircuit(CascadeWithDiodes("cascade", diode=diode, c_cascade=4.7@u_µF))
         circuit.model(mos, mosfets[mos]['type'], LEVEL=6, vt0=mosfets[mos]['vt0'], kv=mosfets[mos]['kv'],
                       nv=mosfets[mos]['nv'], kc=mosfets[mos]['kc'], nc=mosfets[mos]['nc'],
@@ -147,7 +147,10 @@ for diode in diodes:
 
         circuit.R('R_in', 'v_in', 'v_out_r', R_in @ u_Ohm)
         circuit.C('c_ext', 'v_out_r', 'c_ext_out', c_ext @ u_uF)
-        circuit.X('casc', 'cascade', 'v_out_r', 'cascade_pos', 'cascade_neg')
+        #circuit.X('casc', 'cascade', 'v_out_r', 'cascade_pos', 'cascade_neg')
+        circuit.V(1, 'cascade_pos', circuit.gnd, 3 @ u_V)
+        circuit.V(2, circuit.gnd, 'cascade_neg', 3 @ u_V)
+
         circuit.X('amp1', 'amp', 'c_ext_out', circuit.gnd, 'cascade_pos', 'cascade_neg', 'op1_out')
         circuit.X('amp2', 'amp', 'v_out', 'c_ext_out', 'cascade_pos', 'cascade_neg', 'op2_out')
         circuit.MOSFET(1, circuit.gnd, 'op1_out', 'c_ext_out', 'c_ext_out', model=mos)
@@ -156,16 +159,8 @@ for diode in diodes:
         circuit.R('r_sys', 'v_out', circuit.gnd, R_sys@u_Ω)
 
         simulator = circuit.simulator(temperature=25, nominal_temperature=25)
-        analysis = simulator.transient(step_time=source.period / 200, end_time=0.061)
+        analysis = simulator.transient(step_time=source.period / 200, end_time=.1)
 
-        if input_flag:
-            #plt.plot(analysis.time, analysis.v_in)
-
-            #plt.plot(analysis.time, analysis['x1.cascade_neg_out'])
-            input_flag = False
-            legend.append('v_in')
-            legend.append('cascade_pos')
-            #legend.append('cascade_neg')
 
         #plt.plot(analysis.time, analysis['x1.cascade_pos_out'])
         plt.plot(analysis.time, analysis.v_in)
@@ -173,6 +168,8 @@ for diode in diodes:
         plt.plot(analysis.time, analysis.op1_out)
         plt.plot(analysis.time, analysis.op2_out)
         plt.plot(analysis.time, analysis.c_ext_out)
+
+        legend = ["v_in", "v_out", "op1", "op2", "c_ext"]
 
 
         #plt.plot(analysis.time, analysis.branches['vinput'])
