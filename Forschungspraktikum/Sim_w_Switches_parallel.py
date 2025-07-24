@@ -54,8 +54,6 @@ def simulation(params):
     v_buf_min = min(analysis.v_buf[start_time:])
     v_buf_ripple = max(analysis.v_buf[start_time:]) - min(analysis.v_buf[start_time:])
 
-    # check if supply voltage of cascade is in range of ratings of current opv at index i.
-    # check if ripple is lower than 20% of the max voltage the cascade reaches.
     if v_buf_min > V_in @ u_V and v_buf_ripple < v_buf_min * 0.2:
         with lock:
             print(f"found sol for V_in = {V_in} V; R_in = {R_in} Ohm; R_sys = {R_sys} kOhm;"
@@ -69,12 +67,12 @@ def simulation(params):
 
 if __name__ == "__main__":
 
-    R_in_vec = [50, 100, 500, 1000, 2000, 5000, 10000]
-    R_sys_vec = [1, 2, 5, 10, 50, 100, 200]
-    V_in_vec = [0.3, 0.4, 0.6, 0.8, 1, 1.5, 2]
-    C_DC_vec = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000]  # µF
-    C_EXT_vec = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000]  # µF
-    Freq_vec = [10, 20, 30, 40, 50, 60]
+    R_in_vec = [50, 100, 200, 500, 1000, 2000]  # Ohm
+    R_sys_vec = [1, 2, 5, 10, 20, 50, 100, 200]  # kOhm
+    V_in_vec = [0.3, 0.4, 0.6, 0.8, 1, 1.5, 2]  # V
+    C_DC_vec = [1, 2.2, 3.3, 4.7, 10, 22, 33, 47, 100, 220, 330, 470, 680, 1000]  # µF
+    C_EXT_vec = [1, 2.2, 3.3, 4.7, 10, 22, 33, 47, 100, 220, 330, 470, 680, 1000]  # µF
+    Freq_vec = [10, 20, 30, 40, 50, 60]  # Hz
 
     brute_force_counter = 0
     brute_force_total_count = len(C_EXT_vec) * len(R_in_vec) * len(V_in_vec) * len(Freq_vec) * len(C_DC_vec) * len(

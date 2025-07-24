@@ -53,7 +53,7 @@ def simulation(params):
         # Cascade shall have 15s time to reach stability. Next 5s are evaluated due to max/min voltage and ripple.
         start_time = int(.75 * len(analysis.cascade_pos))
 
-        upper_voltage_diff = max(analysis.cascade_pos) - min(analysis.cascade_neg)
+        upper_voltage_diff = max(analysis.cascade_pos[start_time:]) - min(analysis.cascade_neg[start_time:])
         lower_voltage_diff = min(analysis.cascade_pos[start_time:]) - max(analysis.cascade_neg[start_time:])
         pos_ripple = max(analysis.cascade_pos[start_time:]) - min(analysis.cascade_pos[start_time:])
         pos_max = max(analysis.cascade_pos[start_time:])

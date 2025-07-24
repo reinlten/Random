@@ -15,8 +15,8 @@ def moving_average(arr, kernel_size):
 
 
 # Parameter
-dateiname = 'peltier_cooler_data/10ml_1A_alu_no_paste.txt'
-wasser_ml = 10  # Wassermenge in ml
+dateiname = 'peltier_cooler_data/7.3v_paste_2_peltiers.txt'
+wasser_ml = 20  # Wassermenge in ml
 c_wasser = 4186  # J/(kg·K)
 m_wasser = wasser_ml / 1000  # in kg
 intervall_s = 5

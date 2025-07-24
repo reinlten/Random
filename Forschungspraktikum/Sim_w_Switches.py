@@ -76,6 +76,13 @@ for V_in in V_in_vec:
                             print(f"found sol for V_in = {V_in} V; R_in = {R_in} Ohm; R_sys = {R_sys} kOhm;"
                                           f"freq = {freq} Hz; C_DC = {C_DC} µF; C_EXT = {C_EXT} µF")
 
+                            plt.plot(analysis.time, analysis.v_in)
+                            plt.plot(analysis.time, analysis.r_in_out)
+                            plt.plot(analysis.time, analysis.branches['vinput'])
+                            plt.plot(analysis.time, (analysis.v_in-analysis.r_in_out)/R_in)
+                            plt.plot(analysis.time, analysis.v_buf)
+                            plt.legend(['vin', 'r_in_out', 'curr_classic', 'curr_voltage', 'v_buf'])
+                            plt.show()
                             with open("cap_solutions.txt", "a", encoding="utf-8") as datei:
                                 datei.write(f"V_in = {V_in} V; R_in = {R_in} Ohm; R_sys = {R_sys} kOhm;"
                                           f"freq = {freq} Hz; C_DC = {C_DC} µF; C_EXT = {C_EXT} µF")
@@ -91,8 +98,5 @@ for V_in in V_in_vec:
                         datei.write(f"no solution at any capacity for V_in = {V_in} V; R_in = {R_in} Ohm; R_sys = {R_sys} kOhm;"
                                       f"freq = {freq} Hz")
 
-#plt.plot(analysis.time, analysis.v_in)
-#plt.plot(analysis.time, analysis.v_buf)
-#plt.legend(['vin', 'v_buf'])
-#plt.show()
+
 
