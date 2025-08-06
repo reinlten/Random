@@ -2,11 +2,14 @@ import re
 import csv
 from collections import defaultdict
 
-input_file = "eff_solutions_parallel_2.txt"
-output_file = "beste_kombinationen_2.csv"
+input_file = "eff_solutions_parallel_short_2.txt"
+output_file = "best_effs_short_2.csv"
 
 # Regex für key=value
 pattern = re.compile(r'([^=]+)=([^;]+)')
+
+# Erlaubte OpAmps
+allowed_opamps = {"TLV2401", "TLV8802"}
 
 gruppen = defaultdict(lambda: None)
 
@@ -16,17 +19,21 @@ with open(input_file, "r", encoding="utf-8") as f:
         if not line:
             continue
 
-        # Key-Value-Paare extrahieren
+        # Key-Value-Paare extrahieren und Keys säubern
         matches = pattern.findall(line)
-        # Keys säubern: Leerzeichen UND führende Semikolons entfernen
         eintrag = {k.strip().lstrip(";"): v.strip() for k, v in matches}
 
-        # Prüfen, ob alle relevanten Keys vorhanden sind
-        required_keys = ["V_in", "R_in", "R_sys", "freq", "eff"]
+        # Prüfen, ob die wichtigen Keys da sind
+        required_keys = ["V_in", "R_in", "R_sys", "freq", "eff", "opamp"]
         if not all(k in eintrag for k in required_keys):
             print(f"Überspringe fehlerhafte Zeile: {line}")
             continue
 
+        # Nur gewünschte OpAmps zulassen
+        if eintrag["opamp"] not in allowed_opamps:
+            continue
+
+        # Gruppierungsschlüssel
         key = (eintrag["V_in"], eintrag["R_in"], eintrag["R_sys"], eintrag["freq"])
 
         try:
@@ -40,7 +47,7 @@ with open(input_file, "r", encoding="utf-8") as f:
             gruppen[key] = eintrag
 
 # CSV speichern
-felder = ["V_in", "R_in", "R_sys", "freq", "C_DC", "C_EXT", "C_casc", "diode", "opamp", "eff"]
+felder = ["V_in", "R_in", "R_sys", "freq", "eff", "C_DC", "C_EXT", "C_casc", "diode", "opamp", "v_buff_avg", "v_casc_avg"]
 
 with open(output_file, "w", newline="", encoding="utf-8") as csvfile:
     writer = csv.DictWriter(csvfile, fieldnames=felder)

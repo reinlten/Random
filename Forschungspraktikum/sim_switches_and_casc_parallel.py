@@ -19,8 +19,7 @@ from scipy import integrate
 lock = None
 
 opamps = {'TLV2401': [16 @ u_V, 2.5 @ u_V, 2 @ u_uA],
-          'LMR1901YG-M': [5.5 @ u_V, 1.7 @ u_V, 320 @ u_nA],
-          'TLV8802': [5.5 @ u_V, 1.7 @ u_nA, 500 @ u_nA]}
+          'TLV8802': [5.5 @ u_V, 1.7 @ u_V, 700 @ u_nA]}
 
 
 # 'ncs2001': [7 @ u_V, 0.9 @ u_V, 2 @ u_mA]}
@@ -79,7 +78,7 @@ def simulation(params):
     opamp = params[8]
 
     circuit = Circuit(f"Simulation of V_in={V_in};R_in={R_in};R_sys={R_sys};"
-                      f"freq={freq};C_DC={C_DC}µF;C_EXT={C_EXT}µF;C_casc={C_casc};"
+                      f"freq={freq};C_DC={C_DC};C_EXT={C_EXT};C_casc={C_casc};"
                       f"diode={diode};opamp={opamp}")
 
     circuit.model("SW1", "SW", Ron=0.1 @ u_Ohm, Roff=1 @ u_GOhm, Vt=0 @ u_V)
@@ -105,20 +104,23 @@ def simulation(params):
 
     v_buf_min = min(analysis.v_buf[start_time:])
     v_buf_ripple = max(analysis.v_buf[start_time:]) - min(analysis.v_buf[start_time:])
+    amp_in = max(analysis.r_in_out[start_time:])
+    v_buf_avg = sum(analysis.v_buf[start_time:]) / (len(analysis.v_buf[start_time:]))
 
     upper_voltage_diff = max(analysis.cascade_pos[start_time:]) - min(analysis.cascade_neg[:start_time:])
     lower_voltage_diff = min(analysis.cascade_pos[start_time:]) - max(analysis.cascade_neg[start_time:])
     pos_ripple = max(analysis.cascade_pos[start_time:]) - min(analysis.cascade_pos[start_time:])
     pos_max = max(analysis.cascade_pos[start_time:])
+    casc_avg = (upper_voltage_diff + lower_voltage_diff) / 2
 
     # check if supply voltage of cascade is in range of ratings of current opv.
-    # check if ripple is lower than 10% of the max voltage the cascade reaches.
+    # check if ripple is lower than 20% of the max voltage the cascade reaches.
     # check if the output voltage in the buffer is at least the input voltage.
     # check if the buffer_voltage has a ripple of less than 20%
     if opamps[opamp][0] > upper_voltage_diff > opamps[opamp][1] and \
             opamps[opamp][0] > lower_voltage_diff > opamps[opamp][1] and \
-            pos_ripple < pos_max * 0.1 and \
-            v_buf_min > V_in @ u_V and v_buf_ripple < v_buf_min * 0.2:
+            pos_ripple < pos_max * 0.2 and \
+            v_buf_min > amp_in and v_buf_ripple < v_buf_min * 0.2:
         # input power
         p_in = analysis.r_in_out[start_time:] * (analysis.v_in[start_time:] - analysis.r_in_out[start_time:]) / R_in
         p_out = analysis.v_buf[start_time:] ** 2 / R_sys
@@ -128,29 +130,39 @@ def simulation(params):
 
         with lock:
             print(f"found sol for V_in={V_in};R_in={R_in};R_sys={R_sys};"
-                  f"freq={freq};C_DC={C_DC}µF;C_EXT={C_EXT}µF;C_casc={C_casc};"
-                  f"diode={diode};opamp={opamp};eff={eff}")
+                  f"freq={freq};C_DC={C_DC};C_EXT={C_EXT};C_casc={C_casc};"
+                  f"diode={diode};opamp={opamp};eff={eff};v_buff_avg={v_buf_avg};"
+                  f"v_casc_avg={casc_avg}")
 
-            with open("eff_solutions_parallel_2.txt", "a", encoding="utf-8") as datei:
+            with open("eff_solutions_parallel_short_2.txt", "a", encoding="utf-8") as datei:
                 datei.write(f"V_in={V_in};R_in={R_in};R_sys={R_sys};"
-                            f"freq={freq};C_DC={C_DC}µF;C_EXT={C_EXT}µF;C_casc={C_casc};"
-                            f"diode={diode};opamp={opamp};eff={eff}\n")
+                            f"freq={freq};C_DC={C_DC};C_EXT={C_EXT};C_casc={C_casc};"
+                            f"diode={diode};opamp={opamp};eff={eff};v_buff_avg={v_buf_avg};"
+                            f"v_casc_avg={casc_avg}\n")
 
 
 if __name__ == "__main__":
 
-    R_in_vec = [100, 200, 500, 1000]  # Ohm
-    R_sys_vec = [1, 5, 10, 20, 50]  # kOhm
-    V_in_vec = [0.5, 0.75, 1, 1.5]  # V
-    C_DC_vec = [47, 100, 220, 470, 1000]  # µF
-    C_EXT_vec = [47, 100, 220, 470, 1000]  # µF
-    C_casc_vec = [1, 4.7, 10]  # µF
-    Freq_vec = [10, 25, 40, 55]  # Hz
+    #R_in_vec = [100, 200, 500, 1000]  # Ohm
+    #R_sys_vec = [1, 5, 10, 20, 50]  # kOhm
+    #V_in_vec = [0.5, 0.75, 1, 1.5]  # V
+    #C_DC_vec = [47, 100, 220, 470, 1000]  # µF
+    #C_EXT_vec = [47, 100, 220, 470, 1000]  # µF
+    #C_casc_vec = [1, 4.7, 10]  # µF
+    #Freq_vec = [10, 25, 40, 55]  # Hz
+
+    R_in_vec = [200, 1000]  # Ohm
+    R_sys_vec = [2, 20, 200]  # kOhm
+    V_in_vec = [0.5, 1]  # V
+    C_DC_vec = [47, 100, 220, 470]  # µF
+    C_EXT_vec = [47, 100, 220, 470]  # µF
+    C_casc_vec = [2.2, 4.7]  # µF
+    Freq_vec = [20, 50]  # Hz
 
     diodes = {"CDBZC0140L": [1.0e-6, 1.27, 40, 0.004],
               "1SS422": [1.13e-6, 1.07, 30, 0.01],
               # "1SS406": [3.89e-9, 1.06, 20, 0.01],
-              "MBR30H30CTG": [167e-6, 1.4, 30, 10],
+              # "MBR30H30CTG": [167e-6, 1.4, 30, 10],
               "NSRLL30XV2": [21.5e-9, 1.01, 30, 0.01],
               # "HN1D01F": [3.51e-9, 1.86, 80, 0.001],
               # "LL101C": [4e-9, 0.99, 40, 0.0005],
@@ -160,8 +172,7 @@ if __name__ == "__main__":
 
     # opamp: NAME   MAX_SUPPLY  MIN_SUPPLY  CURR_CONSUMPTION
     opamps = {'TLV2401': [16 @ u_V, 2.5 @ u_V, 2 @ u_uA],
-              'LMR1901YG-M': [5.5 @ u_V, 1.7 @ u_V, 320 @ u_nA],
-              'TLV8802': [5.5 @ u_V, 1.7 @ u_nA, 500 @ u_nA]}
+              'TLV8802': [5.5 @ u_V, 1.7 @ u_nA, 700 @ u_nA]}
     # 'ncs2001': [7 @ u_V, 0.9 @ u_V, 2 @ u_mA]}
 
     brute_force_counter = 0

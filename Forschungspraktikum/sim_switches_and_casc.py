@@ -17,8 +17,7 @@ from PySpice.Unit import *
 from scipy import integrate
 
 opamps = {'TLV2401': [16 @ u_V, 2.5 @ u_V, 2 @ u_uA],
-          'LMR1901YG-M': [5.5 @ u_V, 1.7 @ u_V, 320 @ u_nA],
-          'TLV8802': [5.5 @ u_V, 1.7 @ u_nA, 500 @ u_nA]}
+          'TLV8802': [5.5 @ u_V, 1.7 @ u_V, 700 @ u_nA]}
 
 # 'ncs2001': [7 @ u_V, 0.9 @ u_V, 2 @ u_mA]}
 
@@ -59,18 +58,18 @@ class CascadeWithDiodes(SubCircuit):
         self.D(8, 3, 'cascade_pos_out', model=diode)
 
 
-R_in = 1000 @u_Ohm # Ohm
-R_sys = 20 @u_kOhm  # kOhm
+R_in = 2000 @u_Ohm # Ohm
+R_sys = 5 @u_kOhm  # kOhm
 V_in = 0.5 @u_V# V
-freq = 25  @u_Hz# Hz
-C_DC = 100 @u_uF # uF
-C_EXT = 100 @u_uF # uF
-C_casc = 1 @u_uF  # uF
-diode = 'NSRLL30XV2'
+freq = 20  @u_Hz# Hz
+C_DC = 470 @u_uF # uF
+C_EXT = 470 @u_uF # uF
+C_casc = 2.2 @u_uF  # uF
+diode = 'BAT54W-G'
 opamp = 'TLV8802'
 
 circuit = Circuit(f"Simulation of V_in={V_in};R_in={R_in};R_sys={R_sys};"
-                  f"freq={freq};C_DC={C_DC}µF;C_EXT={C_EXT}µF;C_casc={C_casc};"
+                  f"freq={freq};C_DC={C_DC};C_EXT={C_EXT};C_casc={C_casc};"
                   f"diode={diode};opamp={opamp}")
 
 circuit.model("SW1", "SW", Ron=0.1 @ u_Ohm, Roff=1 @ u_GOhm, Vt=0 @ u_V)
@@ -96,11 +95,14 @@ start_time = int(.75 * len(analysis.v_buf))
 
 v_buf_min = min(analysis.v_buf[start_time:])
 v_buf_ripple = max(analysis.v_buf[start_time:]) - min(analysis.v_buf[start_time:])
+v_buf_avg = sum(analysis.v_buf[start_time:])/(len(analysis.v_buf[start_time:]))
+amp_in = max(analysis.r_in_out[start_time:])
 
 upper_voltage_diff = max(analysis.cascade_pos[start_time:]) - min(analysis.cascade_neg[:start_time:])
 lower_voltage_diff = min(analysis.cascade_pos[start_time:]) - max(analysis.cascade_neg[start_time:])
 pos_ripple = max(analysis.cascade_pos[start_time:]) - min(analysis.cascade_pos[start_time:])
 pos_max = max(analysis.cascade_pos[start_time:])
+casc_avg=(upper_voltage_diff+lower_voltage_diff)/2
 
 # check if supply voltage of cascade is in range of ratings of current opv.
 # check if ripple is lower than 10% of the max voltage the cascade reaches.
@@ -108,8 +110,8 @@ pos_max = max(analysis.cascade_pos[start_time:])
 # check if the buffer_voltage has a ripple of less than 20%
 if opamps[opamp][0] > upper_voltage_diff > opamps[opamp][1] and \
         opamps[opamp][0] > lower_voltage_diff > opamps[opamp][1] and \
-        pos_ripple < pos_max * 0.1 and \
-        v_buf_min > V_in @ u_V and v_buf_ripple < v_buf_min * 0.2:
+        pos_ripple < pos_max * 0.2 and \
+        v_buf_min > amp_in and v_buf_ripple < v_buf_min * 0.2:
     # input power
     p_in = analysis.r_in_out[start_time:] * (analysis.v_in[start_time:] - analysis.r_in_out[start_time:]) / R_in
     p_out = analysis.v_buf[start_time:] ** 2 / R_sys
@@ -117,11 +119,10 @@ if opamps[opamp][0] > upper_voltage_diff > opamps[opamp][1] and \
     E_out = integrate.simpson(p_out, x=analysis.time[start_time:])
     eff = E_out/E_in
 
-
     print(f"found sol for V_in={V_in};R_in={R_in};R_sys={R_sys};"
-          f"freq={freq};C_DC={C_DC}µF;C_EXT={C_EXT}µF;C_casc={C_casc};"
-          f"diode={diode};opamp={opamp};eff={eff}")
-    print(p_out[0])
+          f"freq={freq};C_DC={C_DC};C_EXT={C_EXT};C_casc={C_casc};"
+          f"diode={diode};opamp={opamp};eff={eff};v_buff_avg={v_buf_avg};"
+          f"v_casc_avg={casc_avg}")
 
 plt.plot(analysis.time, analysis.v_in)
 plt.plot(analysis.time, analysis.r_in_out)
