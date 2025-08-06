@@ -16,7 +16,7 @@ import numpy as np
 from scipy import integrate
 
 # I_S, N, U_br, I_max_sim
-diodes = {"CDBZC0140L": [1.0e-6, 1.27, 40, 0.004],
+diodes = {"1N4002": [4.12e-10, 1.72, 100, 1],
           "1SS422": [1.13e-6, 1.07, 30, 0.01],
           "1SS406": [3.89e-9, 1.06, 20, 0.01],
           "MBR30H30CTG": [167e-6, 1.4, 30, 10],
@@ -24,17 +24,17 @@ diodes = {"CDBZC0140L": [1.0e-6, 1.27, 40, 0.004],
           "HN1D01F": [3.51e-9, 1.86, 80, 0.001],
           "LL101C": [4e-9, 0.99, 40, 0.0005],
           "1N4151W": [2.57e-9, 1.84, 50, 0.01],
-          "BAT54W-G": [9.77e-8, 1.12, 30, 0.01],
-          "1N4002": [4.12e-10, 1.72, 100, 1]}
+          "BAT54W-G": [9.77e-8, 1.12, 30, 0.01]
+          }
 
 # diodes = {"1SS406": [3.89e-9, 1.06, 20]}
 
-R_sys_vec = [50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000, 50000, 100000, 200000, 500000, 1000000]
-R_in_vec = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000]
-V_in_vec = [0.5, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
+R_L_vec = [100, 200, 500, 1000, 2000, 5000, 10000, 20000, 50000, 100000, 200000, 500000]
+R_in_vec = [50, 100, 200, 500, 1000, 2000]
+V_in_vec = [0.6, 0.7, 0.8, 0.9, 1, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 2]
 C_DC_vec = [1, 2, 5, 10, 20, 50, 100, 200, 500] #,# 1000, 2000, 5000, 10000]
 
-whole_vec = [V_in_vec, C_DC_vec, R_sys_vec, R_in_vec]
+whole_vec = [V_in_vec, C_DC_vec, R_L_vec, R_in_vec]
 
 
 draw_input_voltage_flag = False
@@ -61,7 +61,7 @@ for k in range(len(whole_vec)):
     voltages_in = {}
     total_currents = {}
 
-    efficiency_vec = {"CDBZC0140L": [[], []],
+    efficiency_vec = {"1N4002": [[], []],
                       "1SS422": [[], []],
                       "1SS406": [[], []],
                       "MBR30H30CTG": [[], []],
@@ -69,13 +69,13 @@ for k in range(len(whole_vec)):
                       "HN1D01F": [[], []],
                       "LL101C": [[], []],
                       "1N4151W": [[], []],
-                      "BAT54W-G": [[], []],
-                      "1N4002": [[], []]}
+                      "BAT54W-G": [[], []]
+                      }
 
     for l in range(len(whole_vec[k])):
-        R_sys = 1000  # Ohm
-        R_in = 50  # Ohm
-        V_in = 2  # V
+        R_sys = 2000  # Ohm
+        R_in = 100  # Ohm
+        V_in = 1.5  # V
         freq = 50  # Hz
         C_DC = 10  # µF
 
@@ -103,7 +103,7 @@ for k in range(len(whole_vec)):
             circuit.C('C1', 'output_plus', 'output_minus', C_DC @ u_uF)
 
             simulator = circuit.simulator(temperature=25, nominal_temperature=25)
-            analysis = simulator.transient(step_time=source.period / 200, end_time=source.period * 500)
+            analysis = simulator.transient(step_time=source.period / 200, end_time=source.period * 50)
 
             voltage_in = []
             voltage_out = []
@@ -154,9 +154,9 @@ for k in range(len(whole_vec)):
         for key in diodes:
             # print(f"Efficiency for key (with R and C) {key}: {P_out[key]*100/P_in[key]}%")
             print(f"{key}: {P_out_voltage[key] * 100 / (P_in[key] * R_sys)}%")
-            if max(abs(total_currents[key][500:])) < diodes[key][3]:
-                efficiency_vec[key][1].append(P_out_voltage[key] * 100 / (P_in[key] * R_sys))
-                efficiency_vec[key][0].append(whole_vec[k][l])
+            #if max(abs(total_currents[key][500:])) < diodes[key][3]:
+            efficiency_vec[key][1].append(P_out_voltage[key] * 100 / (P_in[key] * R_sys))
+            efficiency_vec[key][0].append(whole_vec[k][l])
         print()
 
     for key in efficiency_vec:
@@ -172,10 +172,10 @@ for k in range(len(whole_vec)):
     ax[0][0].set_ylabel(r"Wirkungsgrad η / %")
     ax[1][0].set_ylabel(r"Wirkungsgrad η / %")
 
-    ax[1][0].set_xlabel(r"Widerstand $R_{sys}$ / $\Omega$")
+    ax[1][0].set_xlabel(r"Widerstand $R_{L}$ / $\Omega$")
     ax[1][1].set_xlabel(r"Widerstand $R_{in}$ / $\Omega$")
     ax[0][0].set_xlabel(r"Amplitude $Û$ / V")
-    ax[0][1].set_xlabel(r"Kapazität $C_{DC}$ / µF")
+    ax[0][1].set_xlabel(r"Kapazität $C_{L}$ / µF")
 
     # ax.xaxis.set_major_formatter(ticker.FuncFormatter(format_with_comma))
     # ax[1].legend(['$I_{in}$','$I_{sys}$'],loc="lower right")
@@ -184,5 +184,6 @@ for k in range(len(whole_vec)):
     # ax[1].set_xlabel(r"Zeit $t$ / ms")
     # ax[1].set_ylabel(r"Strom $I$ / mA")
 
-    # plt.subplots_adjust(top=0.88, bottom=0.16, left=0.18, right=0.9, hspace=0.2, wspace=0.22)
+    plt.subplots_adjust(top=0.96, bottom=0.16, left=0.18, right=0.9, hspace=0.3, wspace=0.22)
 
+plt.show()
