@@ -6,6 +6,29 @@ import matplotlib.pyplot as plt
 from matplotlib import ticker
 from scipy import integrate
 
+# Dieses Skript wertet die Ergebnisse der Brückengleichrichter-
+# messung aus. Dazu werden die .txt Dateien jeder Messung eingele-sen
+# und jeweils die Effizienz ermittelt. Die Effizienzen werden dann
+# per plot ausgegeben.
+# Die Benennung der .txt Dateien muss folgende Form haben:
+# Ri[…]_RL[…]_f[…]_Uamp[…]_Opv-_MOS-_Kask[…]_C_Kask-_C_Buf[…]_C_Ext-
+# Dabei muss […] durch den entsprechenden Wert ersetzt werden.
+# An der stelle Kask[…] muss die verwendete Diode eingesetzt werden.
+# Die Datei selbst muss von der Form wie folgt sein:
+#
+# U1 (V)   U2 (V)   U3 (V)   U4 (V)   U5 (V)   U6 (V)  t (s)
+#
+# Dabei ist U1: Die Spannung direkt an der Spannungsquelle
+# U2: Die Spannung nach dem Innenwiderstand R_in
+# U3: Die Ausgangsspannung nach der Gleichrichtung
+# Eingabedaten:
+#   - folder: Pfad zum Ordner mit Messdateien
+#
+# Ausgabedaten:
+#   - plot: Effizienzen (y-Achse) in abh. von U1 (x-Achse). Legen-de:
+# 		Diode
+
+
 # Ordner mit Messdateien
 folder = "brueckengleichrichter_messung"
 

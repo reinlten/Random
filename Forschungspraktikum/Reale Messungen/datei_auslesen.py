@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 from scipy import integrate
 
 # === Konfiguration ===
-file_path = "brueckengleichrichter_messung/Ri1001_RL2189_f20_Uamp1.5_Opv-_MOS-_Kask1N4002_C_Kask-_C_Buf220_C_Ext-.txt"
+file_path = "brueckengleichrichter_messung/Ri1001_RL22010_f50_Uamp1.5_Opv-_MOS-_KaskNSRLL_C_Kask-_C_Buf10_C_Ext-.txt"
 
 # Regex für Parameter aus Dateiname
 pattern = re.compile(r"Ri([\d.]+)_RL([\d.]+)_f([\d.]+)_Uamp([\d.]+).*_Kask([^-_]+)")

@@ -15,6 +15,24 @@ from PySpice.Unit import *
 import numpy as np
 from scipy import integrate
 
+# Dieses Skript simuliert Spannungen und Ströme innerhalb einer
+# Brückengleichrichterschaltung.
+# Außerdem wird die Effizienz der Schaltung ermittelt und
+# ausgegeben.
+#
+# Eingabedaten:
+#   - diodes: dict mit Dioden und Parametern
+#   - R_L: Lastwiderstand hinter dem Gleichrichter
+#   - R_in: Innenwiderstand (der Spannungsquelle)
+#   - V_in: Amplitude der Spannungsquelle
+#   - freq: Frequenz der Spannungsquelle
+#   - C_DC: Kapazität des Glättungskondensators (parallel zu R_L)
+#
+# Ausgabedaten:
+#   - plot: Plot versch. Spannungen und Ströme
+#   - per print: Effizienz der Gleichrichtung
+
+
 diodes = {"CDBZC0140L": [1.0e-6, 1.27, 40],
           "1SS422": [1.13e-6, 1.07, 30],
           "1SS406": [3.89e-9, 1.06, 20],
@@ -28,7 +46,7 @@ diodes = {"CDBZC0140L": [1.0e-6, 1.27, 40],
 
 diodes = {"1SS422": [3.89e-9, 1.06, 20]}
 
-R_sys = 2000  # Ohm
+R_L = 2000  # Ohm
 R_in = 40  # Ohm
 V_in = 2  # V
 freq = 50  # Hz
@@ -61,7 +79,7 @@ for key in diodes:
     source = circuit.SinusoidalVoltageSource('input', 'in', circuit.gnd, amplitude=V_in, frequency=freq)
     circuit.D('D2', 'out_in', 'output_plus', model=key)
     circuit.R('R_in', 'in', 'out_in', R_in@u_Ω)
-    circuit.R('R_sys', 'output_plus', 'output_minus', R_sys@u_Ω)
+    circuit.R('R_sys', 'output_plus', 'output_minus', R_L@u_Ω)
     circuit.D('D3', 'output_minus', circuit.gnd, model=key)
     circuit.D('D4', circuit.gnd, 'output_plus', model=key)
     circuit.D('D1', 'output_minus', 'out_in', model=key)
@@ -99,7 +117,7 @@ for key in diodes:
 
     ax[0].plot(time, voltage_out)
     ax[1].plot(time, current)
-    ax[1].plot(times[key], 1000*voltages_out[key]/R_sys)
+    ax[1].plot(times[key], 1000*voltages_out[key]/R_L)
 
 
 def format_with_comma(x, pos):
@@ -142,6 +160,6 @@ for key in diodes:
 
 for key in diodes:
     #print(f"Efficiency for Diode (with R and C) {key}: {P_out[key]*100/P_in[key]}%")
-    print(f"Efficiency for Diode (P only in R) {key}: {P_out_voltage[key] * 100 / (P_in[key]*R_sys)}%")
+    print(f"Efficiency for Diode (P only in R) {key}: {P_out_voltage[key] * 100 / (P_in[key]*R_L)}%")
 
 
