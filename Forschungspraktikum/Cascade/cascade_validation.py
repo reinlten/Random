@@ -69,9 +69,9 @@ R_in_vec = [10, 20, 50, 100, 200, 500, 1000]
 V_in_vec = [0.3, 0.4, 0.6, 0.8, 1, 1.5, 2, 2.5, 3, 3.5, 4]
 C_DC_vec = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000, 50000, 100000]  # µF
 # C_DC_vec = [40, 4, .4, .04]
-opamp_max_supply_vec = [16 @ u_V, 5.5 @ u_V, 7 @ u_V]
-opamp_min_supply_vec = [2.5 @ u_V, 1.7 @ u_V, 0.9 @ u_V]
-opamp_curr_vec = [1800 @ u_nA, 320 @ u_nA, 2 @ u_mA]
+opamp_max_supply_vec = [16 @ u_V, 5.5 @ u_V, 7 @ u_V, 5.5 @ u_V]
+opamp_min_supply_vec = [2.5 @ u_V, 1.7 @ u_V, 0.9 @ u_V, 1.7 @ u_V]
+opamp_curr_vec = [2 @ u_uA, 320 @ u_nA, 2 @ u_mA, 500 @ u_nA]
 opamp_type_vec = ['TLV2401', 'LMR1901YG-M', 'ncs2001']
 
 R_in = 10  # Ohm

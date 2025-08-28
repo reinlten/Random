@@ -1,11 +1,25 @@
 import matplotlib.pyplot as plt
+import numpy as np
+
+def moving_average(arr, kernel_size):
+    """Gleitender Mittelwert mit reflektiertem Rand."""
+    kernel = np.ones(kernel_size) / kernel_size
+
+    # Länge zum Auffüllen
+    pad = kernel_size // 2
+
+    # Ränder reflektiert auffüllen
+    padded = np.pad(arr, (pad, pad), mode='reflect')
+
+    return np.convolve(padded, kernel, mode='valid')
+
 
 # Parameter
 dateiname = 'peltier_cooler_data/7.3v_paste_2_peltiers.txt'
 wasser_ml = 20  # Wassermenge in ml
 c_wasser = 4186  # J/(kg·K)
 m_wasser = wasser_ml / 1000  # in kg
-intervall_s = 20
+intervall_s = 5
 abstand_zwischen_messungen_s = 0.5
 messungen_pro_intervall = int(intervall_s / abstand_zwischen_messungen_s)
 
@@ -22,6 +36,11 @@ with open(dateiname, 'r') as f:
                 werte2.append(float(teile[1]))
             except ValueError:
                 continue
+
+werte1 = moving_average(werte1, 20)
+werte2 = moving_average(werte2, 20)
+
+
 
 # Zeitachse
 zeit = [i * abstand_zwischen_messungen_s for i in range(len(werte1))]

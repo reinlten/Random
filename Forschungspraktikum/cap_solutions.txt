@@ -1,0 +1,1 @@
+V_in = 0.3 V; R_in = 50 Ohm; R_sys = 1 kOhm;freq = 10 Hz; C_DC = 500 µF; C_EXT = 200 µFV_in = 0.3 V; R_in = 50 Ohm; R_sys = 1 kOhm;freq = 10 Hz; C_DC = 500 µF; C_EXT = 200 µFV_in = 0.3 V; R_in = 50 Ohm; R_sys = 1 kOhm;freq = 10 Hz; C_DC = 500 µF; C_EXT = 200 µFV_in = 0.3 V; R_in = 50 Ohm; R_sys = 1 kOhm;freq = 20 Hz; C_DC = 200 µF; C_EXT = 100 µF

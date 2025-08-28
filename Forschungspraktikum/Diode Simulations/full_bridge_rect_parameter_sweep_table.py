@@ -1,4 +1,5 @@
 import copy
+import csv
 
 import matplotlib.pyplot as plt
 import PySpice.Logging.Logging as Logging
@@ -16,22 +17,21 @@ import numpy as np
 from scipy import integrate
 
 # I_S, N, U_br, I_max_sim
-diodes = {"CDBZC0140L": [1.0e-6, 1.27, 40, 0.004],
+diodes = {"1N4002": [4.12e-10, 1.72, 100, 1],
           "1SS422": [1.13e-6, 1.07, 30, 0.01],
           "1SS406": [3.89e-9, 1.06, 20, 0.01],
-          "MBR30H30CTG": [167e-6, 1.4, 30, 10],
-          "NSRLL30XV2": [21.5e-9, 1.01, 30, 0.01],
+          "MBR30H30": [167e-6, 1.4, 30, 10], #MBR30H30CTG
+          "NSRLL30X": [21.5e-9, 1.01, 30, 0.01], #NSRLL30XV2
           "HN1D01F": [3.51e-9, 1.86, 80, 0.001],
           "LL101C": [4e-9, 0.99, 40, 0.0005],
           "1N4151W": [2.57e-9, 1.84, 50, 0.01],
-          "BAT54W-G": [9.77e-8, 1.12, 30, 0.01],
-          "1N4002": [4.12e-10, 1.72, 100, 1]}
+          "BAT54W-G": [9.77e-8, 1.12, 30, 0.01]}
 
 # diodes = {"1SS406": [3.89e-9, 1.06, 20]}
 
-R_sys_vec = [100, 500, 1000, 5000, 10000, 50000, 100000]
-R_in_vec = [50, 100, 500, 1000]
-V_in_vec = [1, 2, 4, 6, 8, 10, 12]
+R_L_vec = [1000, 5000, 10000, 50000, 100000]
+R_in_vec = [100, 500, 1000]
+V_in_vec = [0.75, 1, 1.5]
 freq = 50
 
 draw_input_voltage_flag = False
@@ -41,11 +41,18 @@ plt.rcParams.update({
     "font.sans-serif": "arial",
     "font.size": 16
 })
+rows = []
+header = ['R_L', 'R_in']
+for V in V_in_vec:
+    header.append(f"{V}: Diode")
+    header.append(f"{V}: Eff")
 
-for R_sys in R_sys_vec:
+for R_L in R_L_vec:
     for R_in in R_in_vec:
+        row = [R_L, R_in]
         eff_vec_vec = []
         key_vec = []
+        top_lists = []
         for V_in in V_in_vec:
 
             voltage_in = []
@@ -54,7 +61,7 @@ for R_sys in R_sys_vec:
             voltages_out_squared = {}
             voltages_in = {}
             total_currents = {}
-            C_DC = -2/(50*R_sys*np.log(0.8))
+            C_DC = -2/(50*R_L*np.log(0.8))
             #print(f"Kapazität C = {C_DC}")
 
             for key in diodes:
@@ -71,7 +78,7 @@ for R_sys in R_sys_vec:
                 source = circuit.SinusoidalVoltageSource('input', 'in_in', circuit.gnd, amplitude=V_in, frequency=freq)
                 circuit.D('D2', 'out_in', 'output_plus', model=key)
                 circuit.R('R_in', 'in_in', 'out_in', R_in @ u_Ω)
-                circuit.R('R_sys', 'output_plus', 'output_minus', R_sys @ u_Ω)
+                circuit.R('R_sys', 'output_plus', 'output_minus', R_L @ u_Ω)
                 circuit.D('D3', 'output_minus', circuit.gnd, model=key)
                 circuit.D('D4', circuit.gnd, 'output_plus', model=key)
                 circuit.D('D1', 'output_minus', 'out_in', model=key)
@@ -116,14 +123,38 @@ for R_sys in R_sys_vec:
                 P_out_voltage[key] = integrate.simpson(power_out_voltage[key], x=times[key])
 
             for key in voltages_out:
-                # print(f"Efficiency for key (with R and C) {key}: {P_out[key]*100/P_in[key]}%")
-                # print(f"{key}: {P_out_voltage[key] * 100 / (P_in[key] * R_sys)}%")
-                if max(abs(total_currents[key][500:])) < diodes[key][3]:
-                    eff_vec[key] = P_out_voltage[key] * 100 / (P_in[key] * R_sys)
+                #print(f"Efficiency for key (with R and C) {key}: {P_out[key]*100/P_in[key]}%")
+                #print(f"R_L: {R_L}, R_in: {R_in}, V_in:  {V_in}, D: {key}: {P_out_voltage[key] * 100 / (P_in[key] * R_L)}%")
 
+                if max(abs(total_currents[key][500:])) < diodes[key][3]:
+                    eff_vec[key] = round(P_out_voltage[key] * 100 / (P_in[key] * R_L), 1)
+
+            sorted_desc = dict(sorted(eff_vec.items(), key=lambda item: item[1], reverse=True))
+            print(f"R_L: {R_L}, R_in: {R_in}, V_in:  {V_in}: {sorted_desc}")
+            print(50 * "-")
             max_key = max(eff_vec, key=eff_vec.get)
             #print(f"Sweep: R_sys = {R_sys}, R_in = {R_in}, U_in = {V_in}, C = {C_DC}, Best Diode: {max_key} with value {eff_vec[max_key]}")
             eff_vec_vec.append(round(eff_vec[max_key],1))
             key_vec.append(max_key)
+
+            top4 = sorted(eff_vec.items(), key=lambda x: x[1], reverse=True)[:4]
+            top_lists.append(top4)
+
+        for i in range(4):
+            row = [R_L, R_in]
+            for v_idx in range(len(V_in_vec)):
+                diode, eta = top_lists[v_idx][i]
+                row.append(diode)
+                row.append(f"{round(eta, 1)} %")
+            rows.append(row)
+
+
         #print(eff_vec_vec)
-        print(key_vec)
+        #print(key_vec)
+
+with open('effizienz_top4_brozent.csv', 'w', newline='', encoding='utf-8') as f:
+    writer = csv.writer(f, delimiter=';')
+    writer.writerow(header)
+    writer.writerows(rows)
+
+print("CSV erstellt: effizienz_top4.csv")
