@@ -114,17 +114,16 @@ def get_noise(N, desired_rms):
     return noise
 
 
-if __name__ == "__main__":
+def main_test():
     rms = 0.04e-6  # [T]
     duration = 10
     resolution = 6.25e-9
-
     noise_1 = []
     noise_2 = []
 
     for i in range(3):
-        noise_1.append(get_noise(duration,rms))
-        noise_2.append(get_noise(duration,rms))
+        noise_1.append(get_noise(duration, rms))
+        noise_2.append(get_noise(duration, rms))
 
     noise_1 = np.array(noise_1)
     noise_2 = np.array(noise_2)
@@ -138,7 +137,7 @@ if __name__ == "__main__":
     print(f"initiate simulation with l1@{nom_curr1 * 1e3} mA and l2@{nom_curr2 * 1e3} mA")
 
     for i in range(duration):
-        print(f"Sol for current noise values {noise_1[:,i]} and {noise_2[:,i]}:")
+        print(f"Sol for current noise values {noise_1[:, i]} and {noise_2[:, i]}:")
 
         l1 = Leiter(0.01, 0.015, 0.02, 0.005, nom_curr1)
         l2 = Leiter(0.01, 0.015, 0.02, 0.01, nom_curr2)
@@ -151,8 +150,8 @@ if __name__ == "__main__":
         result_s1 = s1.calc_B([l1, l2]) + noise_1[:, i]
         result_s2 = s2.calc_B([l1, l2]) + noise_2[:, i]
 
-        result_s1 = np.round(result_s1/resolution)*resolution
-        result_s2 = np.round(result_s2/resolution)*resolution
+        result_s1 = np.round(result_s1 / resolution) * resolution
+        result_s2 = np.round(result_s2 / resolution) * resolution
 
         print(calc_curr([l1, l2], [s1, s2], [result_s1, result_s2]))
 
@@ -164,3 +163,57 @@ if __name__ == "__main__":
     plt.scatter(s1.x, s1.y)
     plt.scatter(s2.x, s2.y)
     plt.show()
+
+if __name__ == "__main__":
+    rms = 0.7e-6  # [T]
+    duration = 10
+    resolution = 6.25e-9
+    d = 0.005
+
+    sens_arr = []
+    leiter_arr = []
+    curr_arr = [0.0,0.0]
+
+    for i in range(10):
+        for j in range(10):
+            sens = Sensor(d,0.01+i*0.005,0.01+j*0.005)
+            sens_arr.append(sens)
+
+    for i in range(10):
+        for j in range(10):
+            sens = Sensor(d+0.005,0.01+i*0.005,0.01+j*0.005)
+            sens_arr.append(sens)
+
+    l1 = Leiter(0.02, 0.033, 0.05, 0.043, curr_arr[0])
+    l2 = Leiter(0.02, 0.023, 0.03, 0.013, curr_arr[1])
+
+    leiter_arr.append(l1)
+    leiter_arr.append(l2)
+
+    for i in range(duration):
+        results = []
+        for s in sens_arr:
+            noise_vec = []
+            for i in range(3):
+                noise_vec.append(get_noise(1000, rms))
+
+            noise_vec = np.array(noise_vec)
+            result = s.calc_B(leiter_arr)+noise_vec[:,0]
+            result = np.round(result / resolution) * resolution
+
+            results.append(result)
+
+        print(calc_curr(leiter_arr,sens_arr,results))
+
+    for s in sens_arr:
+        plt.scatter(s.x,s.y)
+
+    for l in leiter_arr:
+        plt.plot(*l.plot())
+
+    plt.show()
+
+
+
+
+
