@@ -26,6 +26,8 @@ class Sensor:
         self.d = d
         self.x = x
         self.y = y
+        self.b_meas = None
+
 
     def calc_B(self, leiter_arr):
         B_ges = 0
@@ -164,56 +166,6 @@ def get_noise(N, desired_rms):
 
     return noise
 
-def main_test():
-    rms = 0.04e-6  # [T]
-    duration = 10
-    resolution = 6.25e-9
-    noise_1 = []
-    noise_2 = []
-
-    for i in range(3):
-        noise_1.append(get_noise(duration, rms))
-        noise_2.append(get_noise(duration, rms))
-
-    noise_1 = np.array(noise_1)
-    noise_2 = np.array(noise_2)
-
-    nom_curr1 = 0  # A
-    nom_curr2 = 0  # A
-
-    s1 = Sensor(0.01, 0.015, 0.015)
-    s2 = Sensor(0.01, 0.015, 0.005)
-
-    print(f"initiate simulation with l1@{nom_curr1 * 1e3} mA and l2@{nom_curr2 * 1e3} mA")
-
-    for i in range(duration):
-        print(f"Sol for current noise values {noise_1[:, i]} and {noise_2[:, i]}:")
-
-        l1 = Leiter(0.01, 0.015, 0.02, 0.005, nom_curr1)
-        l2 = Leiter(0.01, 0.015, 0.02, 0.01, nom_curr2)
-
-        # print(s1.calc_B([l1, l2]))
-        # print(s2.calc_B([l1, l2]))
-
-        # print("------------------------")
-
-        result_s1 = s1.calc_B([l1, l2]) + noise_1[:, i]
-        result_s2 = s2.calc_B([l1, l2]) + noise_2[:, i]
-
-        result_s1 = np.round(result_s1 / resolution) * resolution
-        result_s2 = np.round(result_s2 / resolution) * resolution
-
-        print(calc_curr([l1, l2], [s1, s2], [result_s1, result_s2]))
-
-    l1 = Leiter(0.01, 0.015, 0.02, 0.005, 1)
-    l2 = Leiter(0.01, 0.015, 0.02, 0.01, 1)
-
-    plt.plot(*l1.plot())
-    plt.plot(*l2.plot())
-    plt.scatter(s1.x, s1.y)
-    plt.scatter(s2.x, s2.y)
-    plt.show()
-
 def random_leiter_vars(a,b):
     vars = []
     for i in range(4):
@@ -268,11 +220,12 @@ def random_leiter_segments(curr, N, max_x, max_y, min_x, min_y):
     return leiter_arr
 
 if __name__ == "__main__":
-    rms = 0.2e-6  # [T]
+    rms = 0.2e-6  # [T] 1.2e-7
     duration = 10
     resolution = 6.25e-9
     d = 0.005
-    num_leiter = 5
+    num_leiter = 10
+    num_leiter_segs = 4
     min_len = 0.005
 
     sens_arr = []
@@ -286,16 +239,13 @@ if __name__ == "__main__":
             sens = Sensor(d,0.01+i*0.005,0.01+j*0.005)
             sens_arr.append(sens)
 
-    for i in range(10):
-        for j in range(10):
-            sens = Sensor(d+0.005,0.01+i*0.005,0.01+j*0.005)
-            sens_arr.append(sens)
 
     for i in range(num_leiter):
         curr = random.uniform(-0.05,0.05)
         found_leiter = False
         while not found_leiter:
-            ltr_segs = random_leiter_segments(curr, 5, 0.055, 0.055, 0.01, 0.01)
+            ltr_segs = random_leiter_segments(curr, num_leiter_segs, 0.055,
+                                              0.055, 0.01, 0.01)
             for ltr in ltr_segs:
                 if ltr.L() < min_len:
                     found_leiter = False
@@ -326,6 +276,7 @@ if __name__ == "__main__":
             noise_choice = random.randint(0,999)
             result = s.calc_B(leiter_arr)+noise_vec[:,noise_choice]
             result = np.round(result / resolution) * resolution
+            s.b_meas = result
 
             results.append(result)
 
@@ -341,8 +292,21 @@ if __name__ == "__main__":
     print(f"abs Mittlere Abweichung (mA): {np.mean(abs_diff, axis=1)}")
     print(f"Max abs Abweichung (mA): {np.max(abs_diff, axis=1)}")
 
+    scatter_arr = []
+
     for s in sens_arr:
-        plt.scatter(s.x,s.y)
+        scatter_arr.append([s.x,s.y,np.linalg.norm(s.b_meas)])
+
+    scatter_arr = np.array(scatter_arr)
+
+    sc = plt.scatter(
+        scatter_arr[:, 0], scatter_arr[:, 1],
+        c=scatter_arr[:, 2], cmap="viridis", s=80, edgecolor="k",
+        label="Sensoren"
+    )
+
+    plt.legend()
+    plt.colorbar(sc, label="|B| [Tesla]")
 
     for l in leiter_arr:
         plt.plot(*l.plot())

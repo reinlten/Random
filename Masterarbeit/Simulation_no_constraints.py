@@ -2,7 +2,10 @@ import random
 
 import numpy as np
 import matplotlib.pyplot as plt
+from scipy.optimize import least_squares, differential_evolution
+from scipy.optimize import minimize
 
+MU0 = 4e-7 * np.pi
 
 # Leiter in x-y-Ebene
 # Sensoren um d in Richtung z versetzt.
@@ -58,7 +61,69 @@ class Sensor:
 
         return B_ges
 
-def calc_curr(leiter_arr, sens_arr, b_vec_arr):
+# ----------------------------------------------------
+# Magnetfeld eines endlichen Leiters (Biot-Savart, analytische Form)
+# ----------------------------------------------------
+def B_segment(sensor, x1, y1, x2, y2, I, z_leiter=0.0):
+    """
+    Magnetfeld in sensor (3D) durch einen Leiter von (x1,y1,z_leiter) nach (x2,y2,z_leiter).
+    sensor: np.array([x,y,z])
+    """
+    l_p_1 = np.array([x1,y1,z_leiter])
+    l_p_2 = np.array([x2,y2,z_leiter])
+
+    vec_1 = l_p_2 - l_p_1
+    vec_2 = sensor - l_p_1
+
+    L = np.linalg.norm(vec_1)
+    if L < 1e-12:
+        return np.zeros(3)
+
+    cross = np.cross(vec_1, vec_2)
+
+    rho = np.linalg.norm(cross)/L
+
+    if rho < 1e-9:
+        return np.zeros(3)
+
+    proj = np.dot(vec_1, vec_2) / np.dot(vec_1, vec_1)
+    q = l_p_1 + proj * vec_1
+    M = (l_p_1 + l_p_2) / 2
+
+    pseudo_z = np.linalg.norm(q - M)
+
+    e = cross / np.linalg.norm(cross)
+
+    b_init = (MU0 * I) / (4 * np.pi * rho)
+    b_1 = np.sin(np.arctan((L + pseudo_z) / rho))
+    b_2 = np.sin(np.arctan((L - pseudo_z) / rho))
+
+    B_ges = b_init * (b_1 + b_2) * e
+
+    return B_ges
+
+# ----------------------------------------------------
+# Gesamtes Feld für alle Sensoren + Leiterparameter
+# ----------------------------------------------------
+def B_total(sensors, params, n_leiter):
+    B = np.zeros((len(sensors),3))
+    off=0
+    for k in range(n_leiter):
+        x1,y1,x2,y2,I = params[off:off+5]; off+=5
+        for i,s in enumerate(sensors):
+            B[i] += B_segment(s, x1,y1,x2,y2,I)
+    return B
+
+def residuals(params, sensors, B_meas, n_leiter):
+    return (B_total(sensors, params, n_leiter)-B_meas).ravel()
+
+def cost_vec(params):
+    return (B_total(sensors, params, n_leiter) - B_meas).ravel()
+def cost_scalar(params):
+    r = cost_vec(params)
+    return 0.5 * np.dot(r, r)    # = 0.5 * sum(r^2)
+
+def calc_all(sens_arr, b_vec_arr):
     u0 = 4 * np.pi * 1e-7
 
     A = None
@@ -105,114 +170,12 @@ def calc_curr(leiter_arr, sens_arr, b_vec_arr):
 
     return x
 
-def calc_curr_segments(leiter_seg_arr, sens_arr, b_vec_arr):
-    u0 = 4 * np.pi * 1e-7
-
-    A = None
-
-    for s in sens_arr:
-        cols = []
-        for segs in leiter_seg_arr:
-            b_ges = 0
-            for l in segs:
-                l_p_1 = np.array([l.x1, l.y1, 0])
-                l_p_2 = np.array([l.x2, l.y2, 0])
-                s_p = np.array([s.x, s.y, s.d])
-
-                vec_1 = l_p_2 - l_p_1
-                vec_2 = s_p - l_p_1
-
-                cross = np.cross(vec_1, vec_2)
-
-                rho = np.linalg.norm(cross) / l.L()
-
-                proj = np.dot(vec_1, vec_2) / np.dot(vec_1, vec_1)
-                q = l_p_1 + proj * vec_1
-                M = (l_p_1 + l_p_2) / 2
-
-                pseudo_z = np.linalg.norm(q - M)
-
-                e = cross / np.linalg.norm(cross)
-
-                b_init = (u0) / (4 * np.pi * rho)
-                b_1 = np.sin(np.arctan((l.L() + pseudo_z) / rho))
-                b_2 = np.sin(np.arctan((l.L() - pseudo_z) / rho))
-
-                b_ges += b_init * (b_1 + b_2) * e
-
-            cols.append(b_ges)
-
-        if A is None:
-            A = np.array(cols).T
-        else:
-            A = np.vstack([A, np.array(cols).T])
-
-    b = np.array(b_vec_arr).flatten()
-
-    # print(A)
-    # print(b_vec_arr)
-
-    x, residuals, rank, s = np.linalg.lstsq(A, b, rcond=None)
-
-    return x
-
-
 def get_noise(N, desired_rms):
     noise = np.random.randn(N)
     current_rms = np.sqrt(np.mean(noise ** 2))
     noise = noise * (desired_rms / current_rms)
 
     return noise
-
-def main_test():
-    rms = 0.04e-6  # [T]
-    duration = 10
-    resolution = 6.25e-9
-    noise_1 = []
-    noise_2 = []
-
-    for i in range(3):
-        noise_1.append(get_noise(duration, rms))
-        noise_2.append(get_noise(duration, rms))
-
-    noise_1 = np.array(noise_1)
-    noise_2 = np.array(noise_2)
-
-    nom_curr1 = 0  # A
-    nom_curr2 = 0  # A
-
-    s1 = Sensor(0.01, 0.015, 0.015)
-    s2 = Sensor(0.01, 0.015, 0.005)
-
-    print(f"initiate simulation with l1@{nom_curr1 * 1e3} mA and l2@{nom_curr2 * 1e3} mA")
-
-    for i in range(duration):
-        print(f"Sol for current noise values {noise_1[:, i]} and {noise_2[:, i]}:")
-
-        l1 = Leiter(0.01, 0.015, 0.02, 0.005, nom_curr1)
-        l2 = Leiter(0.01, 0.015, 0.02, 0.01, nom_curr2)
-
-        # print(s1.calc_B([l1, l2]))
-        # print(s2.calc_B([l1, l2]))
-
-        # print("------------------------")
-
-        result_s1 = s1.calc_B([l1, l2]) + noise_1[:, i]
-        result_s2 = s2.calc_B([l1, l2]) + noise_2[:, i]
-
-        result_s1 = np.round(result_s1 / resolution) * resolution
-        result_s2 = np.round(result_s2 / resolution) * resolution
-
-        print(calc_curr([l1, l2], [s1, s2], [result_s1, result_s2]))
-
-    l1 = Leiter(0.01, 0.015, 0.02, 0.005, 1)
-    l2 = Leiter(0.01, 0.015, 0.02, 0.01, 1)
-
-    plt.plot(*l1.plot())
-    plt.plot(*l2.plot())
-    plt.scatter(s1.x, s1.y)
-    plt.scatter(s2.x, s2.y)
-    plt.show()
 
 def random_leiter_vars(a,b):
     vars = []
@@ -268,84 +231,122 @@ def random_leiter_segments(curr, N, max_x, max_y, min_x, min_y):
     return leiter_arr
 
 if __name__ == "__main__":
-    rms = 0.2e-6  # [T]
-    duration = 10
-    resolution = 6.25e-9
-    d = 0.005
-    num_leiter = 5
-    min_len = 0.005
+    # ----------------------------------------------------
+    # Simulation: Wahre Leiter + Sensoren
+    # ----------------------------------------------------
+    #np.random.seed(1)
+    n_leiter = 2
+    d = 0.01  # Abstand Sensorebene
 
-    sens_arr = []
-    leiter_arr = []
-    curr_arr = []
-    curr_arr_mA = []
-    ltr_segs_arr = []
+    # Wahre Leiter zufällig
+    true_params = []
+    for k in range(n_leiter):
+        x1, y1 = np.random.uniform(0.01, 0.05, 2)
+        x2, y2 = np.random.uniform(0.01, 0.05, 2)
+        I = 0.1
+        print(I)
+        true_params.extend([x1, y1, x2, y2, I])
+    true_params = np.array(true_params)
 
+    # Sensorpositionen in Ebene z=d
+    sensors = []
     for i in range(10):
         for j in range(10):
-            sens = Sensor(d,0.01+i*0.005,0.01+j*0.005)
-            sens_arr.append(sens)
+            sensors.append([0.01+0.005*i,0.01+0.005*j,d])
 
-    for i in range(10):
-        for j in range(10):
-            sens = Sensor(d+0.005,0.01+i*0.005,0.01+j*0.005)
-            sens_arr.append(sens)
+    sensors=np.array(sensors)
 
-    for i in range(num_leiter):
-        curr = random.uniform(-0.05,0.05)
-        found_leiter = False
-        while not found_leiter:
-            ltr_segs = random_leiter_segments(curr, 5, 0.055, 0.055, 0.01, 0.01)
-            for ltr in ltr_segs:
-                if ltr.L() < min_len:
-                    found_leiter = False
-                    break
-                found_leiter = True
+    # Gemessene Felder
+    B_meas = B_total(sensors, true_params, n_leiter)
+    #print(B_meas)
+    # Rauschen hinzufügen
+    #B_meas += 0.01 * np.random.randn(*B_meas.shape)
 
-        curr_arr.append(curr)  # A
-        curr_arr_mA.append(curr*1000) # mA
+    # ----------------------------------------------------
+    # Fit
+    # ----------------------------------------------------
+    n_starts = 1
+    best_res = None
+    best_cost = np.inf
 
-        leiter_arr.extend(ltr_segs)
-        ltr_segs_arr.append(ltr_segs)
 
-    print('------currents------')
-    print(curr_arr_mA)
-    print("-------")
 
-    measured_arr = []
+    for trial in range(n_starts):
+        init_params = []
+        for k in range(n_leiter):
+            x1, y1 = np.random.uniform(0.01, 0.05, 2)
+            x2, y2 = np.random.uniform(0.01, 0.05, 2)
+            I = .1
+            init_params.extend([x1, y1, x2, y2, I])
+        init_params = np.array(init_params)
 
-    noise_vec = []
-    for i in range(3):
-        noise_vec.append(get_noise(1000, rms))
+        # NUR LEASTSQUARE ---> FKT NICHT GUT
 
-    noise_vec = np.array(noise_vec)
+        #res = least_squares(
+        #    residuals, init_params,
+        #    args=(sensors, B_meas, n_leiter),
+        #    method="trf", loss="soft_l1", max_nfev=10000
+        #)
 
-    for i in range(duration):
-        results = []
-        for s in sens_arr:
-            noise_choice = random.randint(0,999)
-            result = s.calc_B(leiter_arr)+noise_vec[:,noise_choice]
-            result = np.round(result / resolution) * resolution
+        # NELDER-MEAD ---> FKT SEHR GUT FÜR #LEITER = 1, SONST NICHT GUT
 
-            results.append(result)
+        #res = minimize(cost_scalar, init_params, method='Nelder-Mead',
+        #               options={'maxiter': 200, 'fatol': 1e-3, 'xatol': 1e-3})
 
-        #meas = calc_curr(leiter_arr,sens_arr,results)*1000 # mA
-        meas_segs = calc_curr_segments(ltr_segs_arr,sens_arr,results)*1000 #mA
-        print(meas_segs)
-        measured_arr.append(meas_segs)
 
-    measured_arr = np.array(measured_arr)
-    abs_diff = np.abs(measured_arr-curr_arr_mA)
+        # DIFFERENTIAL EVOLUTION + LEAST SQUARE
 
-    print(f"Mittlere Abweichung (auch neg) (mA): {np.mean(measured_arr-curr_arr_mA, axis=1)} ")
-    print(f"abs Mittlere Abweichung (mA): {np.mean(abs_diff, axis=1)}")
-    print(f"Max abs Abweichung (mA): {np.max(abs_diff, axis=1)}")
+        # bounds: Liste von (min,max) für jede Variable (z.B. 5 vars pro Leiter)
+        bounds = []
+        for k in range(n_leiter):
+            bounds += [(0.01, 0.05), (0.01,0.05), (0.01, 0.05), (0.01, 0.05), (-0.2, 0.2)]  # (x1,y1,x2,y2,I)
 
-    for s in sens_arr:
-        plt.scatter(s.x,s.y)
+        # global search (DE). workers=-1 nutzt alle CPUs
+        de = differential_evolution(cost_scalar, bounds, maxiter=100, popsize=15,
+                                    tol=1e-5, polish=False, workers=-1)
+        p_de = de.x
+        print("DE cost:", de.fun)
 
-    for l in leiter_arr:
-        plt.plot(*l.plot())
+        # lokale Verfeinerung mit least_squares (nutzt Jacobian-Form wenn möglich)
+        res_local = least_squares(cost_vec, p_de, args=(), method='trf', loss='soft_l1',
+                                  max_nfev=2000,
+                                  bounds=(np.array([b[0] for b in bounds]), np.array([b[1] for b in bounds])))
+        p_final = res_local.x
+        print("Final least_squares cost:", 0.5 * np.dot(res_local.fun, res_local.fun))
 
+    #    if res.fun < best_cost:
+    #        best_cost = res.fun
+    #        best_res = res
+
+    #fit_params = best_res.x
+    #print("Bester Residuen-Fehler:", best_cost)
+    #print(f"curr: {fit_params[4]}")
+
+    fit_params = p_final
+    print(f"curr: {fit_params[4]}, {fit_params[9]}")
+    # ----------------------------------------------------
+    # Plot
+    # ----------------------------------------------------
+    def plot_leiter(params, n_leiter, color, label):
+        off = 0
+        for k in range(n_leiter):
+            x1, y1, x2, y2, I = params[off:off + 5];
+            off += 5
+            plt.plot([x1, x2], [y1, y2], color + "-", lw=2, label=label if k == 0 else None)
+
+    B_mag = np.linalg.norm(B_meas, axis=1)
+
+    plt.figure(figsize=(6, 6))
+    sc = plt.scatter(
+        sensors[:, 0], sensors[:, 1],
+        c=B_mag, cmap="viridis", s=80, edgecolor="k",
+        label="Sensoren"
+    )
+    #plt.scatter(sensors[:, 0], sensors[:, 1], c="b", marker="o", label="Sensoren")
+    plot_leiter(true_params, n_leiter, "g", "Wahre Leiter")
+    plot_leiter(fit_params, n_leiter, "r", "Gefittete Leiter")
     plt.axis("equal")
+    plt.legend()
+    plt.colorbar(sc, label="|B| [Tesla]")
     plt.show()
+
