@@ -61,53 +61,49 @@ class Sensor:
         return B_ges
 
 
-def calc_curr_segments(leiter_seg_arr, sens_arr, b_vec_arr):
+def calc_curr_grid(leiter_grid_arr, sens_arr, b_vec_arr):
     u0 = 4 * np.pi * 1e-7
 
     A = None
 
     for sens in sens_arr:
-        cols = []
-        for segs in leiter_seg_arr:
-            b_ges = 0
-            for l in segs:
-                a = np.array([l.x1, l.y1, 0])
-                b = np.array([l.x2, l.y2, 0])
-                s = np.array([sens.x, sens.y, sens.d])
+        r_x_vec = []
+        r_y_vec = []
+        r_z_vec = []
+        for pt in leiter_grid_arr:
+            a = np.array([pt[0], pt[1], 0])
+            s = np.array([sens.x, sens.y, sens.d])
 
-                vec_1 = b - a
-                vec_2 = s - a
-                L = np.linalg.norm(vec_1) / 2
+            r = s-a
 
-                cross = np.cross(vec_1, vec_2)
+            r_x_vec.append((u0/4*np.pi)*(1 / (np.linalg.norm(r)**3)) * r[0])
+            r_y_vec.append((u0/4*np.pi)*(1 / (np.linalg.norm(r)**3)) * r[1])
+            r_z_vec.append((u0/4*np.pi)*(1 / (np.linalg.norm(r)**3)) * r[2])
 
-                rho = np.linalg.norm(cross) / np.linalg.norm(vec_1)
+        r_x_vec = np.ravel(np.asarray(r_x_vec))
+        r_y_vec = np.ravel(np.asarray(r_y_vec))
+        r_z_vec = np.ravel(np.asarray(r_z_vec))
 
-                m = (a + b) / 2
+        if not (r_x_vec.size == r_y_vec.size == r_z_vec.size):
+            raise ValueError("r_x_vec, r_y_vec und r_z_vec müssen die gleiche Länge haben")
 
-                pseudo_z = np.linalg.norm((s-m)*(b-a))/np.linalg.norm(vec_1)
-
-                e = cross / np.linalg.norm(cross)
-
-                b_init = (u0) / (4 * np.pi * rho)
-                b_1 = (L + pseudo_z) / np.sqrt(rho ** 2 + (L + pseudo_z) ** 2)
-                b_2 = (L - pseudo_z) / np.sqrt(rho ** 2 + (L - pseudo_z) ** 2)
-
-                b_ges += b_init * (b_1 + b_2) * e
-
-            cols.append(b_ges)
+        N = r_x_vec.size
+        # Variante: direkt mit concatenate + vstack
+        row0 = np.concatenate([r_z_vec, np.zeros(N, dtype=r_z_vec.dtype)])
+        row1 = np.concatenate([np.zeros(N, dtype=r_z_vec.dtype), -r_z_vec])
+        row2 = np.concatenate([r_y_vec, -r_x_vec])
 
         if A is None:
-            A = np.array(cols).T
+            A = np.array(np.vstack([row0, row1, row2]))
         else:
-            A = np.vstack([A, np.array(cols).T])
+            A = np.vstack([A, np.array(np.vstack([row0, row1, row2]))])
 
     b = np.array(b_vec_arr).flatten()
 
-    # print(A)
-    # print(b_vec_arr)
+    #print(A)
+    #print(b_vec_arr)
 
-    x, residuals, rank, s = np.linalg.lstsq(A, b, rcond=None)
+    x, residuals, rank, s = np.linalg.lstsq(A, b, rcond=.02)
 
     return x
 
@@ -174,12 +170,17 @@ def random_leiter_segments(curr, N, max_x, max_y, min_x, min_y):
 
 if __name__ == "__main__":
     rms = 0.2e-6  # [T] 1.2e-7
-    duration = 10
+    duration = 1
     resolution = 6.25e-9
     d = 0.005
-    num_leiter = 5
-    num_leiter_segs = 5
+    num_leiter = 1
+    num_leiter_segs = 1
     min_len = 0.005
+    dim_magnetic_sensors=20
+    dim_curr_grid = 30
+    dl_mag = 0.05/dim_magnetic_sensors
+    dl = 0.05/dim_curr_grid
+
 
     sens_arr = []
     leiter_arr = []
@@ -187,9 +188,9 @@ if __name__ == "__main__":
     curr_arr_mA = []
     ltr_segs_arr = []
 
-    for i in range(10):
-        for j in range(10):
-            sens = Sensor(d,0.01+i*0.005,0.01+j*0.005)
+    for i in range(dim_magnetic_sensors):
+        for j in range(dim_magnetic_sensors):
+            sens = Sensor(d,0.01+i*dl_mag,0.01+j*dl_mag)
             sens_arr.append(sens)
 
 
@@ -227,23 +228,33 @@ if __name__ == "__main__":
         results = []
         for s in sens_arr:
             noise_choice = random.randint(0,999)
-            result = s.calc_B(leiter_arr)+noise_vec[:,noise_choice]
+            result = s.calc_B(leiter_arr)#+noise_vec[:,noise_choice]
             result = np.round(result / resolution) * resolution
             s.b_meas = result
 
             results.append(result)
 
-        #meas = calc_curr(leiter_arr,sens_arr,results)*1000 # mA
-        meas_segs = calc_curr_segments(ltr_segs_arr,sens_arr,results)*1000 #mA
-        print(meas_segs)
-        measured_arr.append(meas_segs)
 
-    measured_arr = np.array(measured_arr)
-    abs_diff = np.abs(measured_arr-curr_arr_mA)
+        grid_arr = [] # x, y
 
-    print(f"Mittlere Abweichung (auch neg) (mA): {np.mean(measured_arr-curr_arr_mA, axis=1)} ")
-    print(f"abs Mittlere Abweichung (mA): {np.mean(abs_diff, axis=1)}")
-    print(f"Max abs Abweichung (mA): {np.max(abs_diff, axis=1)}")
+        for i in range(dim_curr_grid):
+            for j in range(dim_curr_grid):
+                grid_arr.append(np.array([0.01 + i * dl, 0.01 + j * dl]))
+
+        grid_arr = np.array(grid_arr)
+
+        I_vec = calc_curr_grid(grid_arr,sens_arr,results)*1000*dl #mA
+        I_vec_xy = I_vec.reshape(2,I_vec.size//2).T
+        I_vec_norm = np.linalg.norm(I_vec_xy, axis=1)
+        #print(I_vec)
+        #print(I_vec_xy)
+        #print(I_vec_norm)
+
+        #measured_arr.append(I_vec)
+
+    #measured_arr = np.array(measured_arr)
+    #abs_diff = np.abs(measured_arr-curr_arr_mA)
+
 
     scatter_arr = []
 
@@ -258,8 +269,26 @@ if __name__ == "__main__":
         label="Sensoren"
     )
 
+
     plt.legend()
-    plt.colorbar(sc, label="|B| [Tesla]")
+    plt.colorbar(sc, label="|B| [T]")
+
+
+
+    for l in leiter_arr:
+        plt.plot(*l.plot())
+
+    plt.axis("equal")
+    plt.show()
+
+    sc2 = plt.scatter(
+        grid_arr[:, 0], grid_arr[:, 1],
+        c=I_vec_norm, cmap="plasma", s=80, edgecolor="k",
+        label="Ströme"
+    )
+
+    plt.legend()
+    plt.colorbar(sc2, label="|I| [mA]")
 
     for l in leiter_arr:
         plt.plot(*l.plot())
