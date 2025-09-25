@@ -61,49 +61,52 @@ class Sensor:
         return B_ges
 
 
-def calc_curr_grid(leiter_grid_arr, sens_arr, b_vec_arr):
+def calc_curr_grid(leiter_seg_arr, sens_arr, b_vec_arr):
     u0 = 4 * np.pi * 1e-7
 
     A = None
 
     for sens in sens_arr:
-        r_x_vec = []
-        r_y_vec = []
-        r_z_vec = []
-        for pt in leiter_grid_arr:
-            a = np.array([pt[0], pt[1], 0])
+        cols = []
+
+        for l in leiter_seg_arr:
+            a = np.array([l.x1, l.y1, 0])
+            b = np.array([l.x2, l.y2, 0])
             s = np.array([sens.x, sens.y, sens.d])
 
-            r = s-a
+            vec_1 = b - a
+            vec_2 = s - a
+            L = np.linalg.norm(vec_1) / 2
 
-            r_x_vec.append((u0/4*np.pi)*(1 / (np.linalg.norm(r)**3)) * r[0])
-            r_y_vec.append((u0/4*np.pi)*(1 / (np.linalg.norm(r)**3)) * r[1])
-            r_z_vec.append((u0/4*np.pi)*(1 / (np.linalg.norm(r)**3)) * r[2])
+            cross = np.cross(vec_1, vec_2)
 
-        r_x_vec = np.ravel(np.asarray(r_x_vec))
-        r_y_vec = np.ravel(np.asarray(r_y_vec))
-        r_z_vec = np.ravel(np.asarray(r_z_vec))
+            rho = np.linalg.norm(cross) / np.linalg.norm(vec_1)
 
-        if not (r_x_vec.size == r_y_vec.size == r_z_vec.size):
-            raise ValueError("r_x_vec, r_y_vec und r_z_vec müssen die gleiche Länge haben")
+            m = (a + b) / 2
 
-        N = r_x_vec.size
-        # Variante: direkt mit concatenate + vstack
-        row0 = np.concatenate([r_z_vec, np.zeros(N, dtype=r_z_vec.dtype)])
-        row1 = np.concatenate([np.zeros(N, dtype=r_z_vec.dtype), -r_z_vec])
-        row2 = np.concatenate([r_y_vec, -r_x_vec])
+            pseudo_z = np.linalg.norm((s-m)*(b-a))/np.linalg.norm(vec_1)
+
+            e = cross / np.linalg.norm(cross)
+
+            b_init = (u0) / (4 * np.pi * rho)
+            b_1 = (L + pseudo_z) / np.sqrt(rho ** 2 + (L + pseudo_z) ** 2)
+            b_2 = (L - pseudo_z) / np.sqrt(rho ** 2 + (L - pseudo_z) ** 2)
+
+            b_ges = b_init * (b_1 + b_2) * e
+
+            cols.append(b_ges)
 
         if A is None:
-            A = np.array(np.vstack([row0, row1, row2]))
+            A = np.array(cols).T
         else:
-            A = np.vstack([A, np.array(np.vstack([row0, row1, row2]))])
+            A = np.vstack([A, np.array(cols).T])
 
     b = np.array(b_vec_arr).flatten()
 
-    #print(A)
-    #print(b_vec_arr)
+    # print(A)
+    # print(b_vec_arr)
 
-    x, residuals, rank, s = np.linalg.lstsq(A, b, rcond=.02)
+    x, residuals, rank, s = np.linalg.lstsq(A, b, rcond=None)
 
     return x
 
@@ -176,22 +179,37 @@ if __name__ == "__main__":
     num_leiter = 1
     num_leiter_segs = 1
     min_len = 0.005
-    dim_magnetic_sensors=20
-    dim_curr_grid = 30
-    dl_mag = 0.05/dim_magnetic_sensors
-    dl = 0.05/dim_curr_grid
-
+    dim_magnetic_sensors = 10
+    dim_curr_grid = 5
+    dl_mag = 0.05 / dim_magnetic_sensors
+    dl = 0.05 / dim_curr_grid
 
     sens_arr = []
     leiter_arr = []
     curr_arr = []
     curr_arr_mA = []
     ltr_segs_arr = []
+    grid_arr = []
 
     for i in range(dim_magnetic_sensors):
         for j in range(dim_magnetic_sensors):
-            sens = Sensor(d,0.01+i*dl_mag,0.01+j*dl_mag)
+            sens = Sensor(d, 0.01 + i * dl_mag, 0.01 + j * dl_mag)
             sens_arr.append(sens)
+
+    # create a grid of conductors. In every point, there are 2 conductors pointing in pos x dir and in pos y dir.
+    # translates to:
+    #      |        |
+    #   ---p1--- ---p2--- ...
+    #      |        |
+    for i in range(dim_curr_grid):
+        for j in range(dim_curr_grid):
+            # create horizontal conductor
+            hor = Leiter(0.1+i*dl-dl/2,0.01+j*dl,0.01+i*dl+dl/2, 0.01+j*dl,0)
+
+            # create vertical conductor
+            vert = Leiter(0.1+i*dl,0.01+j*dl-dl/2,0.01+i*dl, 0.01+j*dl+dl/2,0)
+
+            grid_arr.extend([hor, vert])
 
 
     for i in range(num_leiter):
@@ -229,32 +247,24 @@ if __name__ == "__main__":
         for s in sens_arr:
             noise_choice = random.randint(0,999)
             result = s.calc_B(leiter_arr)#+noise_vec[:,noise_choice]
-            result = np.round(result / resolution) * resolution
+            #result = np.round(result / resolution) * resolution
             s.b_meas = result
 
             results.append(result)
 
-
-        grid_arr = [] # x, y
-
-        for i in range(dim_curr_grid):
-            for j in range(dim_curr_grid):
-                grid_arr.append(np.array([0.01 + i * dl, 0.01 + j * dl]))
-
-        grid_arr = np.array(grid_arr)
-
-        I_vec = calc_curr_grid(grid_arr,sens_arr,results)*1000*dl #mA
-        I_vec_xy = I_vec.reshape(2,I_vec.size//2).T
+        #meas = calc_curr(leiter_arr,sens_arr,results)*1000 # mA
+        I_vec = np.array(calc_curr_grid(grid_arr,sens_arr,results)*1000) #mA
+        I_vec_xy = I_vec.reshape(-1,2)
         I_vec_norm = np.linalg.norm(I_vec_xy, axis=1)
-        #print(I_vec)
-        #print(I_vec_xy)
-        #print(I_vec_norm)
+        #print(meas_grid)
+        #measured_arr.append(meas_segs)
 
-        #measured_arr.append(I_vec)
+    scatter_I_coords = []
+    for i in range(dim_curr_grid):
+        for j in range(dim_curr_grid):
+            scatter_I_coords.append(np.array([0.01 + i * dl, 0.01 + j * dl]))
 
-    #measured_arr = np.array(measured_arr)
-    #abs_diff = np.abs(measured_arr-curr_arr_mA)
-
+    scatter_I_coords = np.array(scatter_I_coords)
 
     scatter_arr = []
 
@@ -269,11 +279,8 @@ if __name__ == "__main__":
         label="Sensoren"
     )
 
-
     plt.legend()
-    plt.colorbar(sc, label="|B| [T]")
-
-
+    plt.colorbar(sc, label="|B| [Tesla]")
 
     for l in leiter_arr:
         plt.plot(*l.plot())
@@ -282,7 +289,7 @@ if __name__ == "__main__":
     plt.show()
 
     sc2 = plt.scatter(
-        grid_arr[:, 0], grid_arr[:, 1],
+        scatter_I_coords[:, 0], scatter_I_coords[:, 1],
         c=I_vec_norm, cmap="plasma", s=80, edgecolor="k",
         label="Ströme"
     )

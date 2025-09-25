@@ -235,7 +235,7 @@ if __name__ == "__main__":
     # Simulation: Wahre Leiter + Sensoren
     # ----------------------------------------------------
     #np.random.seed(1)
-    n_leiter = 2
+    n_leiter = 5
     d = 0.01  # Abstand Sensorebene
 
     # Wahre Leiter zufällig
@@ -303,7 +303,7 @@ if __name__ == "__main__":
 
         # global search (DE). workers=-1 nutzt alle CPUs
         de = differential_evolution(cost_scalar, bounds, maxiter=100, popsize=15,
-                                    tol=1e-5, polish=False, workers=-1)
+                                    tol=1e-5, polish=False)
         p_de = de.x
         print("DE cost:", de.fun)
 
