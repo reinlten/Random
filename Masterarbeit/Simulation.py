@@ -173,12 +173,12 @@ def random_leiter_segments(curr, N, max_x, max_y, min_x, min_y):
     return leiter_arr
 
 if __name__ == "__main__":
-    rms = 0.2e-6  # [T] 1.2e-7
+    rms = 700e-9 # [T] 1.2e-7
     duration = 10
     resolution = 6.25e-9
     d = 0.005
-    num_leiter = 5
-    num_leiter_segs = 5
+    num_leiter = 20
+    num_leiter_segs = 2
     min_len = 0.005
 
     sens_arr = []
@@ -235,15 +235,22 @@ if __name__ == "__main__":
 
         #meas = calc_curr(leiter_arr,sens_arr,results)*1000 # mA
         meas_segs = calc_curr_segments(ltr_segs_arr,sens_arr,results)*1000 #mA
-        print(meas_segs)
+        print(meas_segs.tolist())
         measured_arr.append(meas_segs)
 
+    curr_arr_mA = np.array(curr_arr_mA)
     measured_arr = np.array(measured_arr)
     abs_diff = np.abs(measured_arr-curr_arr_mA)
 
-    print(f"Mittlere Abweichung (auch neg) (mA): {np.mean(measured_arr-curr_arr_mA, axis=1)} ")
-    print(f"abs Mittlere Abweichung (mA): {np.mean(abs_diff, axis=1)}")
-    print(f"Max abs Abweichung (mA): {np.max(abs_diff, axis=1)}")
+    print(f"Mittlere Abweichung (auch neg) (mA): {np.mean(measured_arr-curr_arr_mA, axis=0)} ")
+    print(f"abs Mittlere Abweichung (mA): {np.mean(abs_diff, axis=0)}")
+    print(f"Max abs Abweichung (mA): {np.max(abs_diff, axis=0)}")
+
+    print(40*"-")
+    print("true currs:")
+    print(curr_arr_mA)
+    print("avg_measurement: ")
+    print(measured_arr.mean(axis=0))
 
     scatter_arr = []
 

@@ -90,15 +90,11 @@ class Platine:
         return [0, self.length*1e3, self.length*1e3, 0, 0], [0, 0, self.width*1e3, self.width*1e3,0]
 
 
-
-
 def ccw(A, B, C):
-    """Hilfsfunktion: Prüft die Orientierung"""
     return (C[1] - A[1]) * (B[0] - A[0]) > (B[1] - A[1]) * (C[0] - A[0])
 
 
 def segments_intersect(l1: Leiter, l2: Leiter) -> bool:
-    """Prüft, ob sich zwei Segmente im 2D schneiden (nur wenn z gleich)"""
     if l1.z != l2.z:
         return False  # Unterschiedliche Ebenen schneiden sich nicht
 
@@ -109,14 +105,12 @@ def segments_intersect(l1: Leiter, l2: Leiter) -> bool:
 
 
 def add_leiterliste_if_no_intersections(existing: List[Leiter], new_list: List[Leiter]) -> bool:
-    """Fügt neue Liste hinzu, falls keine Schnittpunkte entstehen"""
     for l_new in new_list:
         for l_old in existing:
             if segments_intersect(l_new, l_old):
                 return False  # Schnittpunkt gefunden → nicht hinzufügen
 
     return True
-
 
 
 class Magnetfeld_Sensor:
@@ -130,8 +124,8 @@ class Magnetfeld_Sensor:
         B_ges = 0
         u0 = 4 * np.pi * 1e-7
         for l in leiter_arr:
-            a = np.array([l.x1, l.y1, 0])
-            b = np.array([l.x2, l.y2, 0])
+            a = np.array([l.x1, l.y1, l.z])
+            b = np.array([l.x2, l.y2, l.z])
             s = np.array([self.x, self.y, self.d])
 
             vec_1 = b - a
@@ -155,6 +149,7 @@ class Magnetfeld_Sensor:
             B_ges += b_init * (b_1 + b_2) * e
 
         return B_ges
+
 
 
 class CurrSensor:
@@ -195,6 +190,7 @@ class CurrSensor:
         for sens in self.sens_arr:
             sens.b_meas = sens.calc_B(self.p.ltr_arr)
 
+
     def scatter_arr(self):
         scatter_arr = []
 
@@ -204,18 +200,29 @@ class CurrSensor:
         return np.array(scatter_arr)
 
 
-def calc_curr_segments(leiter_seg_arr, sens_arr, b_vec_arr):
+def calc_curr_segments(leiter_seg_arr, sens_arr, rms, resolution,alpha):
     u0 = 4 * np.pi * 1e-7
 
     A = None
+    b_vec_arr = []
+
+    noise_vec = []
+    for i in range(3):
+        noise_vec.append(get_noise(1000, rms))
+
+    noise_vec = np.array(noise_vec)
 
     for sens in sens_arr:
+        meas = sens.b_meas + noise_vec[:, random.randint(0, 999)]
+        meas = np.round(meas / resolution) * resolution
+
+        b_vec_arr.append(meas)
         cols = []
         for segs in leiter_seg_arr:
             b_ges = 0
             for l in segs:
-                a = np.array([l.x1, l.y1, 0])
-                b = np.array([l.x2, l.y2, 0])
+                a = np.array([l.x1, l.y1, l.z])
+                b = np.array([l.x2, l.y2, l.z])
                 s = np.array([sens.x, sens.y, sens.d])
 
                 vec_1 = b - a
@@ -223,15 +230,10 @@ def calc_curr_segments(leiter_seg_arr, sens_arr, b_vec_arr):
                 L = np.linalg.norm(vec_1) / 2
 
                 cross = np.cross(vec_1, vec_2)
-
                 rho = np.linalg.norm(cross) / np.linalg.norm(vec_1)
-
                 m = (a + b) / 2
-
                 pseudo_z = np.linalg.norm((s - m) * (b - a)) / np.linalg.norm(vec_1)
-
                 e = cross / np.linalg.norm(cross)
-
                 b_init = (u0) / (4 * np.pi * rho)
                 b_1 = (L + pseudo_z) / np.sqrt(rho ** 2 + (L + pseudo_z) ** 2)
                 b_2 = (L - pseudo_z) / np.sqrt(rho ** 2 + (L - pseudo_z) ** 2)
@@ -247,10 +249,10 @@ def calc_curr_segments(leiter_seg_arr, sens_arr, b_vec_arr):
 
     b = np.array(b_vec_arr).flatten()
 
-    # print(A)
-    # print(b_vec_arr)
+    A_aug = np.vstack([A, np.sqrt(alpha) * np.eye(A.shape[1])])
+    b_aug = np.concatenate([b, np.zeros(A.shape[1])])
 
-    x, residuals, rank, s = np.linalg.lstsq(A, b, rcond=None)
+    x, residuals, rank, s = np.linalg.lstsq(A_aug, b_aug, rcond=None)
 
     return x
 
@@ -317,98 +319,3 @@ def random_leiter_segments(curr, N, max_x, max_y, min_x, min_y, z):
         last_choice = next_choice
 
     return leiter_arr
-
-
-if __name__ == "__main__":
-    rms = 0.2e-6  # [T] 1.2e-7
-    duration = 10
-    resolution = 6.25e-9
-    d = 0.005
-    num_leiter = 5
-    num_leiter_segs = 5
-    min_len = 0.005
-
-    sens_arr = []
-    leiter_arr = []
-    curr_arr = []
-    curr_arr_mA = []
-    ltr_segs_arr = []
-
-    for i in range(10):
-        for j in range(10):
-            sens = Magnetfeld_Sensor(d, 0.01 + i * 0.005, 0.01 + j * 0.005)
-            sens_arr.append(sens)
-
-    for i in range(num_leiter):
-        curr = random.uniform(-0.05, 0.05)
-        found_leiter = False
-        while not found_leiter:
-            ltr_segs = random_leiter_segments(curr, num_leiter_segs, 0.055,
-                                              0.055, 0.01, 0.01)
-            for ltr in ltr_segs:
-                if ltr.L() < min_len:
-                    found_leiter = False
-                    break
-                found_leiter = True
-
-        curr_arr.append(curr)  # A
-        curr_arr_mA.append(curr * 1000)  # mA
-
-        leiter_arr.extend(ltr_segs)
-        ltr_segs_arr.append(ltr_segs)
-
-    print('------currents------')
-    print(curr_arr_mA)
-    print("-------")
-
-    measured_arr = []
-
-    noise_vec = []
-    for i in range(3):
-        noise_vec.append(get_noise(1000, rms))
-
-    noise_vec = np.array(noise_vec)
-
-    for i in range(duration):
-        results = []
-        for s in sens_arr:
-            noise_choice = random.randint(0, 999)
-            result = s.calc_B(leiter_arr) + noise_vec[:, noise_choice]
-            result = np.round(result / resolution) * resolution
-            s.b_meas = result
-
-            results.append(result)
-
-        # meas = calc_curr(leiter_arr,sens_arr,results)*1000 # mA
-        meas_segs = calc_curr_segments(ltr_segs_arr, sens_arr, results) * 1000  # mA
-        print(meas_segs)
-        measured_arr.append(meas_segs)
-
-    measured_arr = np.array(measured_arr)
-    abs_diff = np.abs(measured_arr - curr_arr_mA)
-
-    print(f"Mittlere Abweichung (auch neg) (mA): {np.mean(measured_arr - curr_arr_mA, axis=1)} ")
-    print(f"abs Mittlere Abweichung (mA): {np.mean(abs_diff, axis=1)}")
-    print(f"Max abs Abweichung (mA): {np.max(abs_diff, axis=1)}")
-
-    scatter_arr = []
-
-    for s in sens_arr:
-        scatter_arr.append([s.x, s.y, np.linalg.norm(s.b_meas)])
-
-    scatter_arr = np.array(scatter_arr)
-
-    sc = plt.scatter(
-        scatter_arr[:, 0], scatter_arr[:, 1],
-        c=scatter_arr[:, 2], cmap="viridis", s=80, edgecolor="k",
-        label="Sensoren"
-    )
-
-    plt.legend()
-    plt.colorbar(sc, label="|B| [Tesla]")
-
-    for l in leiter_arr:
-        plt.plot(*l.plot())
-
-    plt.axis("equal")
-    plt.show()
