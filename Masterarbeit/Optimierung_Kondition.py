@@ -30,11 +30,10 @@ platine_num_leiter = [[2,6,6]]
 platine_num_segs_range = [[1,1]]
 
 num_mag_sens = [12,8]
-z_values = []
-dist_sensors = [[3e-3,3e-3],[4e-3,4.5e-3],[3.69e-3,4.24e-3]]
-shift = [False, False, True]
+z_values = [[2.75e-3],[2.75e-3,4.6e-3], [2.75e-3, 4.6e-3, 5.75e-3,7.6e-3]]
+dist_sensors = [3e-3,3e-3]
 
-rms = 0#700e-9
+rms = 700e-9
 resolution = 6.25e-9
 
 num_iter_inner = 1
@@ -47,13 +46,13 @@ total_runs = len(platine_dims)*len(num_mag_sens)*num_iter_outer*len(platine_num_
 for i in range(len(platine_dims)):
     for k in range(len(platine_num_leiter[i])):
         for l in range(num_iter_outer):
-            for m in range(len(num_mag_sens)):
+            for m in range(len(z_values)):
                 measured_arr = []
 
                 p = sf.Platine(platine_dims[i], platine_thickness, platine_num_segs_range[i],platine_num_leiter[i][k],max_curr,
                                min_ltr_seg_len)
 
-                s = sf.CurrSensor(num_mag_sens[m], dist_sensors[m], platine_thickness, z_dist, p, shift[m])
+                s = sf.CurrSensor(num_mag_sens, dist_sensors, platine_thickness, p, z_values[m])
 
                 true_curr = np.array(p.curr_arr_mA)
                 # Calculate Currents in Conductors:
@@ -88,11 +87,13 @@ for i in range(len(platine_dims)):
 
                 fig, ax = plt.subplots(1, 2, figsize=(12, 5), constrained_layout=True)
 
+                ax[1] = fig.add_subplot(111, projection='3d')
+
                 scatter_arr = s.scatter_arr()
 
-                sc = plt.scatter(
-                    scatter_arr[:, 0]*1e3, scatter_arr[:, 1]*1e3,
-                    c=scatter_arr[:, 2]*1e6, cmap="viridis", s=80, edgecolor="k",
+                sc = ax[1].scatter(
+                    scatter_arr[:, 0]*1e3, scatter_arr[:, 1]*1e3, scatter_arr[:,2]*1e3,
+                    c=scatter_arr[:, 3]*1e6, cmap="viridis", s=80, edgecolor="k",
                     label="Sensoren"
                 )
 

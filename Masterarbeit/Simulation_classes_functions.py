@@ -166,18 +166,15 @@ def calc_b_coeffs_new(ltr, sens):
 
 
 class CurrSensor:
-    def __init__(self, num_sens_mag, dist_sensors, platine_thickness, z_dist_platine, p, do_shift):
+    def __init__(self, num_sens_mag, dist_sensors, platine_thickness, p, z_values):
         self.num_sensors_x_up = num_sens_mag[0]
         self.num_sensors_y_up = num_sens_mag[1]
-        self.num_sensors_x_down = num_sens_mag[2]
-        self.num_sensors_y_down = num_sens_mag[3]
         self.dist_sensors_x = dist_sensors[1]
         self.dist_sensors_y = dist_sensors[0]
         self.z_dist_up_down = platine_thickness
-        self.z_dist_platine = z_dist_platine
         self.sens_arr = []
         self.p = p
-        self.do_shift = do_shift
+        self.z_values = z_values
 
         #     o      o
         #--------------------------- | platine_thickness
@@ -186,26 +183,13 @@ class CurrSensor:
         #                    |
         #---------------------------
         #
-        self.shift_x = 0
-        self.shift_y = 0
 
-        if self.do_shift:
-            self.shift_x = self.dist_sensors_x/4
-            self.shift_y = self.dist_sensors_y/4
-
-        pos_x_up = self.p.length/2-((self.num_sensors_x_up-1)/2)*self.dist_sensors_x + self.shift_x
-        pos_y_up = self.p.width/2-((self.num_sensors_y_up-1)/2)*self.dist_sensors_y + self.shift_y
-        pos_x_down = self.p.length/2-((self.num_sensors_x_down-1)/2)*self.dist_sensors_x - self.shift_x
-        pos_y_down = self.p.width/2-((self.num_sensors_y_down-1)/2)*self.dist_sensors_y - self.shift_y
+        pos_x = self.p.length/2-((self.num_sensors_x_up-1)/2)*self.dist_sensors_x
+        pos_y = self.p.width/2-((self.num_sensors_y_up-1)/2)*self.dist_sensors_y
 
         for i in range(self.num_sensors_x_up):
             for j in range(self.num_sensors_y_up):
-                sens = Magnetfeld_Sensor(self.z_dist_platine+platine_thickness, pos_x_up + i * self.dist_sensors_x, pos_y_up + j * self.dist_sensors_y)
-                self.sens_arr.append(sens)
-
-        for i in range(self.num_sensors_x_down):
-            for j in range(self.num_sensors_y_down):
-                sens = Magnetfeld_Sensor(self.z_dist_platine, pos_x_down + i * self.dist_sensors_x, pos_y_down + j * self.dist_sensors_y)
+                sens = Magnetfeld_Sensor(self.z_values[(i+j)%len(z_values)], pos_x + i * self.dist_sensors_x, pos_y + j * self.dist_sensors_y)
                 self.sens_arr.append(sens)
 
         for sens in self.sens_arr:
@@ -216,7 +200,7 @@ class CurrSensor:
         scatter_arr = []
 
         for s in self.sens_arr:
-            scatter_arr.append([s.x, s.y, np.linalg.norm(s.b_meas)])
+            scatter_arr.append([s.x, s.y, s.d, np.linalg.norm(s.b_meas)])
 
         return np.array(scatter_arr)
 
