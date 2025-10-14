@@ -150,7 +150,7 @@ def calc_b_coeffs(ltr, sens):
     return b_init * (b_1 + b_2) * e
 
 def calc_b_coeffs_new(ltr, sens):
-    u0 = 1#4 * np.pi * 1e-7 !!!! TESTING
+    u0 = 1 #4 * np.pi * 1e-7 SCALE FACTOR REMOVED !!!!!!!!!!!!!!!! TODO
     a = np.array([ltr.x1, ltr.y1, ltr.z])
     b = np.array([ltr.x2, ltr.y2, ltr.z])
     s = np.array([sens.x, sens.y, sens.d])
@@ -366,11 +366,11 @@ def overdetermined_row_diagnostics(A, eps=1e-16, compute_full_row_gram=True):
             # approximate off-diagonal energy via sample variance of dot-products
             off_energy = float(np.mean(dots))  # rough proxy (0..1)
 
-    print(f'singular_values {s}')
+    #print(f'singular_values {s}')
     print(f'kappa_A {kappa_A}')
-    print(f'effective_rank {r_eff}')
-    print(f'eigvals_AtA {eigvals_AtA}')
+    #print(f'effective_rank {r_eff}')
+    #print(f'eigvals_AtA {eigvals_AtA}')
     #print(f'leverage_scores {leverages}')
-    print(f'mutual_coherence_rows_est {mu}')
+    #print(f'mutual_coherence_rows_est {mu}')
     #print(f'off_diag_energy_rows_est {off_energy}')
 

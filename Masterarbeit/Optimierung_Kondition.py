@@ -33,10 +33,10 @@ num_mag_sens = [12,8]
 z_values = [[2.75e-3],[2.75e-3,4.6e-3], [2.75e-3, 4.6e-3, 5.75e-3,7.6e-3]]
 dist_sensors = [3e-3,3e-3]
 
-rms = 700e-9
+rms = 700e-9*(1/(4 * np.pi * 1e-7 ))
 resolution = 6.25e-9
 
-num_iter_inner = 1
+num_iter_inner = 10
 num_iter_outer = 1
 
 progress_counter = 0
@@ -45,12 +45,15 @@ total_runs = len(platine_dims)*len(num_mag_sens)*num_iter_outer*len(platine_num_
 
 for i in range(len(platine_dims)):
     for k in range(len(platine_num_leiter[i])):
+
+        p = sf.Platine(platine_dims[i], platine_thickness, platine_num_segs_range[i], platine_num_leiter[i][k],
+                       max_curr,
+                       min_ltr_seg_len)
+
         for l in range(num_iter_outer):
             for m in range(len(z_values)):
                 measured_arr = []
 
-                p = sf.Platine(platine_dims[i], platine_thickness, platine_num_segs_range[i],platine_num_leiter[i][k],max_curr,
-                               min_ltr_seg_len)
 
                 s = sf.CurrSensor(num_mag_sens, dist_sensors, platine_thickness, p, z_values[m])
 
