@@ -1,12 +1,13 @@
 import random
 import numpy as np
-import matplotlib.pyplot as plt
 from typing import NamedTuple, List
-
+from numpy.linalg import svd, eigvals, norm
 
 
 # Leiter in x-y-Ebene
 # Sensoren um d in Richtung z versetzt.
+
+
 
 class Leiter:
     def __init__(self, x1, y1, x2, y2, z, curr):
@@ -25,12 +26,12 @@ class Leiter:
 
 
 class Platine:
-    def __init__(self, dims, thickness, num_ltr_segs_range, num_ltr_range, max_curr, min_ltr_seg_len):
+    def __init__(self, dims, thickness, num_ltr_segs_range, num_ltr, max_curr, min_ltr_seg_len):
         self.length = dims[1]
         self.width = dims[0]
         self.thickness = thickness
         self.num_ltr_segs_range = num_ltr_segs_range
-        self.num_ltr_range = num_ltr_range
+        self.num_ltr = num_ltr
         self.ltr_arr = []
         self.ltr_segs_arr = []
         self.curr_arr = []
@@ -38,7 +39,7 @@ class Platine:
         self.max_curr = max_curr
         self.min_len = min_ltr_seg_len
 
-        for i in range(random.randint(self.num_ltr_range[0], self.num_ltr_range[1])):
+        for i in range(self.num_ltr):
             curr = random.uniform(-self.max_curr, self.max_curr)
             found_leiter = False
             b1 = False
@@ -62,7 +63,7 @@ class Platine:
             self.ltr_arr.extend(ltr_segs)
             self.ltr_segs_arr.append(ltr_segs)
 
-        for i in range(random.randint(self.num_ltr_range[0], self.num_ltr_range[1])):
+        for i in range(self.num_ltr):
             curr = random.uniform(-self.max_curr, self.max_curr)
             found_leiter = False
             b1 = False
@@ -124,45 +125,59 @@ class Magnetfeld_Sensor:
         B_ges = 0
         u0 = 4 * np.pi * 1e-7
         for l in leiter_arr:
-            a = np.array([l.x1, l.y1, l.z])
-            b = np.array([l.x2, l.y2, l.z])
-            s = np.array([self.x, self.y, self.d])
-
-            vec_1 = b - a
-            vec_2 = s - a
-            L = np.linalg.norm(vec_1) / 2
-
-            cross = np.cross(vec_1, vec_2)
-
-            rho = np.linalg.norm(cross) / np.linalg.norm(vec_1)
-
-            m = (a + b) / 2
-
-            pseudo_z = np.linalg.norm((s - m) * (b - a)) / np.linalg.norm(vec_1)
-
-            e = cross / np.linalg.norm(cross)
-
-            b_init = (u0 * l.curr) / (4 * np.pi * rho)
-            b_1 = (L + pseudo_z) / np.sqrt(rho ** 2 + (L + pseudo_z) ** 2)
-            b_2 = (L - pseudo_z) / np.sqrt(rho ** 2 + (L - pseudo_z) ** 2)
-
-            B_ges += b_init * (b_1 + b_2) * e
+            B_ges += l.curr*calc_b_coeffs_new(l,self)
 
         return B_ges
 
+def calc_b_coeffs(ltr, sens):
+    u0 = 4 * np.pi * 1e-7
+    a = np.array([ltr.x1, ltr.y1, ltr.z])
+    b = np.array([ltr.x2, ltr.y2, ltr.z])
+    s = np.array([sens.x, sens.y, sens.d])
+
+    vec_1 = b - a
+    vec_2 = s - a
+    L = np.linalg.norm(vec_1) / 2
+
+    cross = np.cross(vec_1, vec_2)
+    rho = np.linalg.norm(cross) / np.linalg.norm(vec_1)
+    m = (a + b) / 2
+    pseudo_z = np.dot((s - m),vec_1) / np.linalg.norm(vec_1)
+    e = cross / np.linalg.norm(cross)
+    b_init = u0 / (4 * np.pi * rho)
+    b_1 = (L + pseudo_z) / np.sqrt(rho ** 2 + (L + pseudo_z) ** 2)
+    b_2 = (L - pseudo_z) / np.sqrt(rho ** 2 + (L - pseudo_z) ** 2)
+    return b_init * (b_1 + b_2) * e
+
+def calc_b_coeffs_new(ltr, sens):
+    u0 = 1#4 * np.pi * 1e-7 !!!! TESTING
+    a = np.array([ltr.x1, ltr.y1, ltr.z])
+    b = np.array([ltr.x2, ltr.y2, ltr.z])
+    s = np.array([sens.x, sens.y, sens.d])
+    u = b - a
+    v = s - a
+
+    cross = np.cross(u, v)
+
+    b_1 = np.dot(v,u)/np.linalg.norm(v)
+    b_2 = (np.linalg.norm(u)**2-np.dot(v,u))/np.linalg.norm(s-b)
+
+    return (u0/(4*np.pi))*(cross/(np.linalg.norm(cross))**2)*(b_1+b_2)
 
 
 class CurrSensor:
-    def __init__(self, num_sens_mag, dist_sensors, platine_thickness, z_dist_platine, p):
+    def __init__(self, num_sens_mag, dist_sensors, platine_thickness, z_dist_platine, p, do_shift):
         self.num_sensors_x_up = num_sens_mag[0]
         self.num_sensors_y_up = num_sens_mag[1]
         self.num_sensors_x_down = num_sens_mag[2]
         self.num_sensors_y_down = num_sens_mag[3]
-        self.dist_sensors = dist_sensors
+        self.dist_sensors_x = dist_sensors[1]
+        self.dist_sensors_y = dist_sensors[0]
         self.z_dist_up_down = platine_thickness
         self.z_dist_platine = z_dist_platine
         self.sens_arr = []
         self.p = p
+        self.do_shift = do_shift
 
         #     o      o
         #--------------------------- | platine_thickness
@@ -171,20 +186,26 @@ class CurrSensor:
         #                    |
         #---------------------------
         #
+        self.shift_x = 0
+        self.shift_y = 0
 
-        pos_x_up = self.p.length/2-((self.num_sensors_x_up-1)/2)*self.dist_sensors
-        pos_y_up = self.p.width/2-((self.num_sensors_y_up-1)/2)*self.dist_sensors
-        pos_x_down = self.p.length/2-((self.num_sensors_x_down-1)/2)*self.dist_sensors
-        pos_y_down = self.p.width/2-((self.num_sensors_y_down-1)/2)*self.dist_sensors
+        if self.do_shift:
+            self.shift_x = self.dist_sensors_x/4
+            self.shift_y = self.dist_sensors_y/4
+
+        pos_x_up = self.p.length/2-((self.num_sensors_x_up-1)/2)*self.dist_sensors_x + self.shift_x
+        pos_y_up = self.p.width/2-((self.num_sensors_y_up-1)/2)*self.dist_sensors_y + self.shift_y
+        pos_x_down = self.p.length/2-((self.num_sensors_x_down-1)/2)*self.dist_sensors_x - self.shift_x
+        pos_y_down = self.p.width/2-((self.num_sensors_y_down-1)/2)*self.dist_sensors_y - self.shift_y
 
         for i in range(self.num_sensors_x_up):
             for j in range(self.num_sensors_y_up):
-                sens = Magnetfeld_Sensor(self.z_dist_platine+platine_thickness, pos_x_up + i * dist_sensors, pos_y_up + j * dist_sensors)
+                sens = Magnetfeld_Sensor(self.z_dist_platine+platine_thickness, pos_x_up + i * self.dist_sensors_x, pos_y_up + j * self.dist_sensors_y)
                 self.sens_arr.append(sens)
 
         for i in range(self.num_sensors_x_down):
             for j in range(self.num_sensors_y_down):
-                sens = Magnetfeld_Sensor(self.z_dist_platine, pos_x_down + i * dist_sensors, pos_y_down + j * dist_sensors)
+                sens = Magnetfeld_Sensor(self.z_dist_platine, pos_x_down + i * self.dist_sensors_x, pos_y_down + j * self.dist_sensors_y)
                 self.sens_arr.append(sens)
 
         for sens in self.sens_arr:
@@ -201,8 +222,6 @@ class CurrSensor:
 
 
 def calc_curr_segments(leiter_seg_arr, sens_arr, rms, resolution,alpha):
-    u0 = 4 * np.pi * 1e-7
-
     A = None
     b_vec_arr = []
 
@@ -221,24 +240,7 @@ def calc_curr_segments(leiter_seg_arr, sens_arr, rms, resolution,alpha):
         for segs in leiter_seg_arr:
             b_ges = 0
             for l in segs:
-                a = np.array([l.x1, l.y1, l.z])
-                b = np.array([l.x2, l.y2, l.z])
-                s = np.array([sens.x, sens.y, sens.d])
-
-                vec_1 = b - a
-                vec_2 = s - a
-                L = np.linalg.norm(vec_1) / 2
-
-                cross = np.cross(vec_1, vec_2)
-                rho = np.linalg.norm(cross) / np.linalg.norm(vec_1)
-                m = (a + b) / 2
-                pseudo_z = np.linalg.norm((s - m) * (b - a)) / np.linalg.norm(vec_1)
-                e = cross / np.linalg.norm(cross)
-                b_init = (u0) / (4 * np.pi * rho)
-                b_1 = (L + pseudo_z) / np.sqrt(rho ** 2 + (L + pseudo_z) ** 2)
-                b_2 = (L - pseudo_z) / np.sqrt(rho ** 2 + (L - pseudo_z) ** 2)
-
-                b_ges += b_init * (b_1 + b_2) * e
+                b_ges += calc_b_coeffs_new(l,sens)
 
             cols.append(b_ges)
 
@@ -249,10 +251,17 @@ def calc_curr_segments(leiter_seg_arr, sens_arr, rms, resolution,alpha):
 
     b = np.array(b_vec_arr).flatten()
 
-    A_aug = np.vstack([A, np.sqrt(alpha) * np.eye(A.shape[1])])
-    b_aug = np.concatenate([b, np.zeros(A.shape[1])])
+    #print(A)
 
-    x, residuals, rank, s = np.linalg.lstsq(A_aug, b_aug, rcond=None)
+    #print(b)
+
+    overdetermined_row_diagnostics(A, compute_full_row_gram=True)
+
+
+    #A_aug = np.vstack([A, np.sqrt(alpha) * np.eye(A.shape[1])])
+    #b_aug = np.concatenate([b, np.zeros(A.shape[1])])
+
+    x, residuals, rank, s = np.linalg.lstsq(A, b, rcond=None)
 
     return x
 
@@ -319,3 +328,65 @@ def random_leiter_segments(curr, N, max_x, max_y, min_x, min_y, z):
         last_choice = next_choice
 
     return leiter_arr
+
+
+def overdetermined_row_diagnostics(A, eps=1e-16, compute_full_row_gram=True):
+    """
+    A: m x n with m > n (overdetermined)
+    Returns key diagnostics about conditioning and row redundancy.
+    If compute_full_row_gram is False and m is large, mutual coherence uses a memory-friendly method.
+    """
+    m, n = A.shape
+    # SVD (economy)
+    U, s, Vt = svd(A, full_matrices=False)   # U: m x n, s: length n
+    sigma1 = s[0]
+    sigmamin = s[-1] if s.size>0 else 0.0
+    kappa_A = np.inf if sigmamin <= 0 else float(sigma1 / sigmamin)
+    # effective rank (entropy)
+    ps = s / (s.sum() + eps)
+    r_eff = float(np.exp(-np.sum(ps * np.log(ps + eps))))
+    # column-gram (n x n) eigenvalues (efficient)
+    # eigenvalues of A^T A are s**2
+    eigvals_AtA = s**2
+    # Leverage scores (rows)
+    leverages = np.sum(U**2, axis=1)  # length m, sum ~ rank n
+
+    # Mutual coherence of rows:
+    row_norms = np.linalg.norm(A, axis=1)
+    nonzero = row_norms > 0
+    if compute_full_row_gram and m <= 2000:
+        # safe to compute full m x m Gram
+        An = (A[nonzero].T / row_norms[nonzero]).T
+        C = An @ An.T
+        np.fill_diagonal(C, 0.0)
+        mu = float(np.max(np.abs(C))) if C.size>0 else 0.0
+        off_energy = norm((A @ A.T) - np.diag(np.diag(A @ A.T)), 'fro') / (norm(np.diag(np.diag(A @ A.T)), 'fro') + eps)
+    else:
+        # memory-friendly approximate mutual coherence: sample pairs
+        nn = nonzero.sum()
+        if nn <= 1:
+            mu = 0.0
+            off_energy = 0.0
+        else:
+            # sample up to S random pairs
+            S = min(200000, nn*(nn-1)//2)
+            # uniformly sample pairs
+            i = np.random.randint(0, nn, size=S)
+            j = np.random.randint(0, nn, size=S)
+            mask = i != j
+            i = i[mask]; j = j[mask]
+            ai = A[nonzero][i] / (row_norms[nonzero][i][:,None] + eps)
+            aj = A[nonzero][j] / (row_norms[nonzero][j][:,None] + eps)
+            dots = np.abs(np.sum(ai * aj, axis=1))
+            mu = float(np.max(dots)) if dots.size>0 else 0.0
+            # approximate off-diagonal energy via sample variance of dot-products
+            off_energy = float(np.mean(dots))  # rough proxy (0..1)
+
+    print(f'singular_values {s}')
+    print(f'kappa_A {kappa_A}')
+    print(f'effective_rank {r_eff}')
+    print(f'eigvals_AtA {eigvals_AtA}')
+    #print(f'leverage_scores {leverages}')
+    print(f'mutual_coherence_rows_est {mu}')
+    #print(f'off_diag_energy_rows_est {off_energy}')
+

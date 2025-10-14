@@ -20,7 +20,7 @@ locale.setlocale(locale.LC_NUMERIC, "de_DE.UTF-8")
 mpl.rcParams['axes.formatter.use_locale'] = True
 
 platine_thickness = 1.6e-3
-z_dist = 5e-3
+z_dist = 3e-3
 
 max_curr = 50e-3  # A
 min_ltr_seg_len = 4e-3
@@ -29,7 +29,8 @@ platine_dims = [[24e-3,36e-3]]  # width, length
 platine_num_leiter = [[2,6,6]]
 platine_num_segs_range = [[1,1]]
 
-num_mag_sens = [[4,4,0,0],[8,6,8,6],[8,6,8,6]]
+num_mag_sens = [12,8]
+z_values = []
 dist_sensors = [[3e-3,3e-3],[4e-3,4.5e-3],[3.69e-3,4.24e-3]]
 shift = [False, False, True]
 
