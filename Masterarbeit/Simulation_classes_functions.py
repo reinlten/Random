@@ -63,29 +63,29 @@ class Platine:
             self.ltr_arr.extend(ltr_segs)
             self.ltr_segs_arr.append(ltr_segs)
 
-        for i in range(self.num_ltr):
-            curr = random.uniform(-self.max_curr, self.max_curr)
-            found_leiter = False
-            b1 = False
-            while not found_leiter:
-                ltr_segs = random_leiter_segments(curr, random.randint(self.num_ltr_segs_range[0],
-                                                                          self.num_ltr_segs_range[1]), self.length,
-                                                     self.width, 0, 0, -thickness)
+        #for i in range(self.num_ltr):
+        #    curr = random.uniform(-self.max_curr, self.max_curr)
+        #    found_leiter = False
+        #    b1 = False
+        #    while not found_leiter:
+        #       ltr_segs = random_leiter_segments(curr, random.randint(self.num_ltr_segs_range[0],
+        #                                                                  self.num_ltr_segs_range[1]), self.length,
+        #                                             self.width, 0, 0, -thickness)
 
-                for ltr in ltr_segs:
-                    if ltr.L() < self.min_len:
-                        b1 = False
-                        break
-                    b1 = True
+#                for ltr in ltr_segs:
+ #                   if ltr.L() < self.min_len:
+  #                      b1 = False
+   #                     break
+    #                b1 = True
 
-                if add_leiterliste_if_no_intersections(self.ltr_arr, ltr_segs) and b1:
-                    found_leiter = True
+     #           if add_leiterliste_if_no_intersections(self.ltr_arr, ltr_segs) and b1:
+      #              found_leiter = True
 
-            self.curr_arr.append(curr)  # A
-            self.curr_arr_mA.append(curr * 1000)  # mA
-
-            self.ltr_arr.extend(ltr_segs)
-            self.ltr_segs_arr.append(ltr_segs)
+ #           self.curr_arr.append(curr)  # A
+  #          self.curr_arr_mA.append(curr * 1000)  # mA
+#
+ #           self.ltr_arr.extend(ltr_segs)
+  #          self.ltr_segs_arr.append(ltr_segs)
 
     def plot_outline(self):
         return [0, self.length*1e3, self.length*1e3, 0, 0], [0, 0, self.width*1e3, self.width*1e3,0]
@@ -150,7 +150,7 @@ def calc_b_coeffs(ltr, sens):
     return b_init * (b_1 + b_2) * e
 
 def calc_b_coeffs_new(ltr, sens):
-    u0 = 1 #4 * np.pi * 1e-7 SCALE FACTOR REMOVED !!!!!!!!!!!!!!!! TODO
+    u0 = 4 * np.pi * 1e-7
     a = np.array([ltr.x1, ltr.y1, ltr.z])
     b = np.array([ltr.x2, ltr.y2, ltr.z])
     s = np.array([sens.x, sens.y, sens.d])
@@ -166,15 +166,18 @@ def calc_b_coeffs_new(ltr, sens):
 
 
 class CurrSensor:
-    def __init__(self, num_sens_mag, dist_sensors, platine_thickness, p, z_values):
+    def __init__(self, num_sens_mag, dist_sensors, platine_thickness, z_dist_platine, p, shift):
         self.num_sensors_x_up = num_sens_mag[0]
         self.num_sensors_y_up = num_sens_mag[1]
-        self.dist_sensors_x = dist_sensors[1]
-        self.dist_sensors_y = dist_sensors[0]
+        self.num_sensors_x_down = num_sens_mag[2]
+        self.num_sensors_y_down = num_sens_mag[3]
+        self.dist_sensors_x = dist_sensors[0]
+        self.dist_sensors_y = dist_sensors[1]
         self.z_dist_up_down = platine_thickness
+        self.z_dist_platine = z_dist_platine
         self.sens_arr = []
         self.p = p
-        self.z_values = z_values
+        self.shift = shift
 
         #     o      o
         #--------------------------- | platine_thickness
@@ -184,12 +187,26 @@ class CurrSensor:
         #---------------------------
         #
 
-        pos_x = self.p.length/2-((self.num_sensors_x_up-1)/2)*self.dist_sensors_x
-        pos_y = self.p.width/2-((self.num_sensors_y_up-1)/2)*self.dist_sensors_y
+        x_shift = 0
+        y_shift = 0
+
+        if self.shift:
+            x_shift = self.dist_sensors_x / 4
+            y_shift = self.dist_sensors_y / 4
+
+        pos_x_up = self.p.length/2-((self.num_sensors_x_up-1)/2)*self.dist_sensors_x + x_shift
+        pos_y_up = self.p.width/2-((self.num_sensors_y_up-1)/2)*self.dist_sensors_y + y_shift
+        pos_x_down = self.p.length/2-((self.num_sensors_x_down-1)/2)*self.dist_sensors_x - x_shift
+        pos_y_down = self.p.width/2-((self.num_sensors_y_down-1)/2)*self.dist_sensors_y - y_shift
 
         for i in range(self.num_sensors_x_up):
             for j in range(self.num_sensors_y_up):
-                sens = Magnetfeld_Sensor(self.z_values[(i+j)%len(z_values)], pos_x + i * self.dist_sensors_x, pos_y + j * self.dist_sensors_y)
+                sens = Magnetfeld_Sensor(self.z_dist_platine+platine_thickness, pos_x_up + i * self.dist_sensors_x, pos_y_up + j * self.dist_sensors_y)
+                self.sens_arr.append(sens)
+
+        for i in range(self.num_sensors_x_down):
+            for j in range(self.num_sensors_y_down):
+                sens = Magnetfeld_Sensor(self.z_dist_platine, pos_x_down + i * self.dist_sensors_x, pos_y_down + j * self.dist_sensors_y)
                 self.sens_arr.append(sens)
 
         for sens in self.sens_arr:
@@ -200,9 +217,10 @@ class CurrSensor:
         scatter_arr = []
 
         for s in self.sens_arr:
-            scatter_arr.append([s.x, s.y, s.d, np.linalg.norm(s.b_meas)])
+            scatter_arr.append([s.x, s.y, np.linalg.norm(s.b_meas)])
 
         return np.array(scatter_arr)
+
 
 
 def calc_curr_segments(leiter_seg_arr, sens_arr, rms, resolution,alpha):
@@ -239,15 +257,28 @@ def calc_curr_segments(leiter_seg_arr, sens_arr, rms, resolution,alpha):
 
     #print(b)
 
-    overdetermined_row_diagnostics(A, compute_full_row_gram=True)
+    k = 10
 
+    A = np.tile(A, (k, 1))  # A k-mal untereinander anhängen
+    b = np.tile(b, k)
+
+    U, s, Vt = svd(A, full_matrices=False)  # U: m x n, s: length n
+    sigma1 = s[0]
+    sigmamin = s[-1] if s.size > 0 else 0.0
+    kappa_A = np.inf if sigmamin <= 0 else float(sigma1 / sigmamin)
+
+    AtA_inv = np.linalg.inv(A.T @ A)
+    Cov_x = rms ** 2 * AtA_inv
+
+    std_x = np.sqrt(np.diag(Cov_x))
+    print(f"std:{std_x*1000}")
 
     #A_aug = np.vstack([A, np.sqrt(alpha) * np.eye(A.shape[1])])
     #b_aug = np.concatenate([b, np.zeros(A.shape[1])])
 
     x, residuals, rank, s = np.linalg.lstsq(A, b, rcond=None)
 
-    return x
+    return x, kappa_A
 
 
 def get_noise(N, desired_rms):

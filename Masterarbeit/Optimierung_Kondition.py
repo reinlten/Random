@@ -19,24 +19,24 @@ plt.rcParams.update({
 locale.setlocale(locale.LC_NUMERIC, "de_DE.UTF-8")
 mpl.rcParams['axes.formatter.use_locale'] = True
 
-platine_thickness = 1.6e-3
-z_dist = 3e-3
+platine_thickness = 1.625e-3
+z_dist = 2.75e-3
 
 max_curr = 50e-3  # A
 min_ltr_seg_len = 4e-3
 
 platine_dims = [[24e-3,36e-3]]  # width, length
-platine_num_leiter = [[2,6,6]]
-platine_num_segs_range = [[1,1]]
+platine_num_leiter = [[2,3,4,5,6]]
+platine_num_segs_range = [[2,10]]
 
-num_mag_sens = [12,8]
-z_values = [[2.75e-3],[2.75e-3,4.6e-3], [2.75e-3, 4.6e-3, 5.75e-3,7.6e-3]]
-dist_sensors = [3e-3,3e-3]
+num_mag_sens = [[12,8,0,0],[8,6,8,6],[8,6,8,6]]
+dist_sensors = [[3e-3,3e-3],[4.5e-3,4e-3],[4.24e-3, 3.69e-3]]
+shift = [False, False, True]
 
-rms = 700e-9*(1/(4 * np.pi * 1e-7 ))
+rms = 700e-9
 resolution = 6.25e-9
 
-num_iter_inner = 10
+num_iter_inner = 1
 num_iter_outer = 1
 
 progress_counter = 0
@@ -45,31 +45,37 @@ total_runs = len(platine_dims)*len(num_mag_sens)*num_iter_outer*len(platine_num_
 
 for i in range(len(platine_dims)):
     for k in range(len(platine_num_leiter[i])):
-
-        p = sf.Platine(platine_dims[i], platine_thickness, platine_num_segs_range[i], platine_num_leiter[i][k],
-                       max_curr,
-                       min_ltr_seg_len)
-
         for l in range(num_iter_outer):
-            for m in range(len(z_values)):
+
+            p = sf.Platine(platine_dims[i], platine_thickness, platine_num_segs_range[i], platine_num_leiter[i][k],
+                           max_curr,
+                           min_ltr_seg_len)
+
+            for m in range(len(num_mag_sens)):
                 measured_arr = []
 
 
-                s = sf.CurrSensor(num_mag_sens, dist_sensors, platine_thickness, p, z_values[m])
+                s = sf.CurrSensor(num_mag_sens[m], dist_sensors[m], platine_thickness, z_dist, p, shift[m])
 
                 true_curr = np.array(p.curr_arr_mA)
                 # Calculate Currents in Conductors:
                 for j in range(num_iter_inner):
-                    currents = sf.calc_curr_segments(p.ltr_segs_arr, s.sens_arr, rms, resolution, 0)*1000  # mA
-                    print(currents.tolist())
+                    currents, kappa = sf.calc_curr_segments(p.ltr_segs_arr, s.sens_arr, rms, resolution, 0)  # mA
+                    print((currents*1000).tolist())
+                    print(f"kappa = {kappa}")
                     deviation = true_curr-currents
                     measured_arr.extend(deviation.tolist())
+
+                    with open("all_kappas.txt", "a", encoding="utf-8") as datei:
+                        datei.write(f"num_leiter={len(p.curr_arr)}; "
+                                    f"config_{m};"
+                                    f"kappa={kappa}\n")
 
                 #measured_arr = np.array(measured_arr)
                 #mean_measured = measured_arr.mean(axis=0)
                 #std_measured = measured_arr.std(axis=0)
-                progress_counter += 1
-                print(f"progress = {round(100 * progress_counter / total_runs, 2)} %")
+                #progress_counter += 1
+                #print(f"progress = {round(100 * progress_counter / total_runs, 2)} %")
 
                 #with open("data_fixed_dut_size.txt", "a", encoding="utf-8") as datei:
                 #    datei.write(f"num_leiter={len(p.curr_arr)}; "
@@ -79,7 +85,7 @@ for i in range(len(platine_dims)):
 
 
 
-                print("-" * 40)
+                #print("-" * 40)
                 print("True Currents:")
                 print(np.array(p.curr_arr_mA))
                 #print("avg meas Current:")
@@ -90,13 +96,11 @@ for i in range(len(platine_dims)):
 
                 fig, ax = plt.subplots(1, 2, figsize=(12, 5), constrained_layout=True)
 
-                ax[1] = fig.add_subplot(111, projection='3d')
-
                 scatter_arr = s.scatter_arr()
 
-                sc = ax[1].scatter(
-                    scatter_arr[:, 0]*1e3, scatter_arr[:, 1]*1e3, scatter_arr[:,2]*1e3,
-                    c=scatter_arr[:, 3]*1e6, cmap="viridis", s=80, edgecolor="k",
+                sc = plt.scatter(
+                    scatter_arr[:, 0]*1e3, scatter_arr[:, 1]*1e3,
+                    c=scatter_arr[:, 2]*1e6, cmap="viridis", s=80, edgecolor="k",
                     label="Sensoren"
                 )
 
