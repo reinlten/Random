@@ -221,35 +221,6 @@ class CurrSensor:
 
         return np.array(scatter_arr)
 
-def calc_condition(leiter_seg_arr, sens_arr, rms, resolution):
-    A = None
-
-    for sens in sens_arr:
-        cols = []
-        for segs in leiter_seg_arr:
-            b_ges = 0
-            for l in segs:
-                b_ges += calc_b_coeffs_new(l, sens)
-
-            cols.append(b_ges)
-
-        if A is None:
-            A = np.array(cols).T
-        else:
-            A = np.vstack([A, np.array(cols).T])
-
-
-    U, s, Vt = svd(A, full_matrices=False)  # U: m x n, s: length n
-    sigma1 = s[0]
-    sigmamin = s[-1] if s.size > 0 else 0.0
-    kappa_A = np.inf if sigmamin <= 0 else float(sigma1 / sigmamin)
-
-    AtA_inv = np.linalg.inv(A.T @ A)
-    Cov_x = rms ** 2 * AtA_inv
-
-    std_x = np.sqrt(np.diag(Cov_x))*1000 # A -> mA
-
-    return kappa_A, std_x
 
 
 def calc_curr_segments(leiter_seg_arr, sens_arr, rms, resolution,alpha):
@@ -286,6 +257,11 @@ def calc_curr_segments(leiter_seg_arr, sens_arr, rms, resolution,alpha):
 
     #print(b)
 
+    k = 10
+
+    A = np.tile(A, (k, 1))  # A k-mal untereinander anhängen
+    b = np.tile(b, k)
+
     U, s, Vt = svd(A, full_matrices=False)  # U: m x n, s: length n
     sigma1 = s[0]
     sigmamin = s[-1] if s.size > 0 else 0.0
@@ -293,15 +269,16 @@ def calc_curr_segments(leiter_seg_arr, sens_arr, rms, resolution,alpha):
 
     AtA_inv = np.linalg.inv(A.T @ A)
     Cov_x = rms ** 2 * AtA_inv
-    std_x = np.sqrt(np.diag(Cov_x))*1000
-    #print(f"std:{std_x*1000}")
+
+    std_x = np.sqrt(np.diag(Cov_x))
+    print(f"std:{std_x*1000}")
 
     #A_aug = np.vstack([A, np.sqrt(alpha) * np.eye(A.shape[1])])
     #b_aug = np.concatenate([b, np.zeros(A.shape[1])])
 
     x, residuals, rank, s = np.linalg.lstsq(A, b, rcond=None)
 
-    return x*1000, std_x #, kappa_A
+    return x  #, kappa_A
 
 
 def get_noise(N, desired_rms):

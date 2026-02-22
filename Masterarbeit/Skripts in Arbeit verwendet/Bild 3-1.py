@@ -22,19 +22,18 @@ mpl.rcParams['axes.formatter.use_locale'] = True
 platine_thickness = 1.6e-3
 z_dist = 5e-3
 
-max_curr = 100e-3  # A
+max_curr = 50e-3  # A
 min_ltr_seg_len = 4e-3
 
 platine_dims = [[24e-3,36e-3]]  # width, length;
 platine_num_leiter = [[4,4,4]]
 platine_num_segs_range = [[3,3]]
 
-num_mag_sens = [[12,8,0,0],[8,6,8,6],[8,6,8,6],[8,6,0,0],[6,4,6,4],[6,4,6,4]]
-dist_sensors = [[3e-3,3e-3],[4.5e-3,4e-3],[4.5e-3,4e-3],[4e-3,4e-3],[6e-3,6e-3],[6e-3,6e-3]]
-shift = [False, False, True, False, False, True]
-rms = [700e-9,700e-9,700e-9,120e-9,120e-9,120e-9]
+num_mag_sens = [[12,8,0,0],[8,6,8,6],[8,6,8,6]]
+dist_sensors = [[3e-3,3e-3],[4.5e-3,4e-3],[4.5e-3,4e-3]]
+shift = [False, False, True]
 
-#rms = 700e-9
+rms = 700e-9
 resolution = 6.25e-9
 
 num_iter_inner = 1
@@ -43,42 +42,31 @@ num_iter_outer = 1
 progress_counter = 0
 total_runs = len(platine_dims)*len(num_mag_sens)*num_iter_outer*len(platine_num_leiter[0])
 
-std = 0
 
 for i in range(len(platine_dims)):
     for k in range(len(platine_num_leiter[i])):
         for l in range(num_iter_outer):
-            p = sf.Platine(platine_dims[i], platine_thickness, platine_num_segs_range[i], platine_num_leiter[i][k],
-                           max_curr,
-                           min_ltr_seg_len)
-
-
-            true_curr = np.array(p.curr_arr_mA)
-            print("True Currents:")
-            print(p.curr_arr_mA)
-            print("Measured currs:")
-
             for m in range(len(num_mag_sens)):
                 measured_arr = []
-                measured_all_curr = []
+
+                p = sf.Platine(platine_dims[i], platine_thickness, platine_num_segs_range[i],platine_num_leiter[i][k],max_curr,
+                               min_ltr_seg_len)
 
                 s = sf.CurrSensor(num_mag_sens[m], dist_sensors[m], platine_thickness, z_dist, p, shift[m])
 
-
+                true_curr = np.array(p.curr_arr_mA)
                 # Calculate Currents in Conductors:
                 for j in range(num_iter_inner):
-                    currents, std = sf.calc_curr_segments(p.ltr_segs_arr, s.sens_arr, rms[m], resolution, 0)
+                    currents = sf.calc_curr_segments(p.ltr_segs_arr, s.sens_arr, rms, resolution, 0)*1000  # mA
                     print(currents.tolist())
                     deviation = true_curr-currents
-                    #print(deviation.tolist())
                     measured_arr.extend(deviation.tolist())
-                    measured_all_curr.append(currents)
 
                 #measured_arr = np.array(measured_arr)
                 #mean_measured = measured_arr.mean(axis=0)
                 #std_measured = measured_arr.std(axis=0)
                 progress_counter += 1
-                #print(f"progress = {round(100 * progress_counter / total_runs, 2)} %")
+                print(f"progress = {round(100 * progress_counter / total_runs, 2)} %")
 
                 #with open("data_fixed_dut_size.txt", "a", encoding="utf-8") as datei:
                 #    datei.write(f"num_leiter={len(p.curr_arr)}; "
@@ -88,13 +76,9 @@ for i in range(len(platine_dims)):
 
 
 
-                #print("-" * 40)
-
-                #print("Standardabweichung:")
-                #print(np.mean(std).tolist())
-
-                #print("Standardabweichung erster Wert:")
-                #print(np.std(np.array(measured_all_curr),axis=0).tolist())
+                print("-" * 40)
+                print("True Currents:")
+                print(np.array(p.curr_arr_mA))
                 #print("avg meas Current:")
                 #print(mean_measured)
                 #print("var meas Current:")
