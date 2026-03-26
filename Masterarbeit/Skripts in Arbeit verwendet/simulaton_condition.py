@@ -1,5 +1,9 @@
-import locale
+# Skript berechnet die Kondition der Matrix A bei zufällig erzeug-ten
+# PCBs sowie die Fehlerfortpflanzung des Sensorrauschens (simula-
+# tiv).
+# Wird in Bild 3-2, Bild 3-4 und Bild 3-5 angewendet.
 
+import locale
 import numpy as np
 from matplotlib import pyplot as plt
 import matplotlib as mpl
@@ -19,6 +23,8 @@ plt.rcParams.update({
 locale.setlocale(locale.LC_NUMERIC, "de_DE.UTF-8")
 mpl.rcParams['axes.formatter.use_locale'] = True
 
+
+# PARAMETER START ------------------------------------
 platine_thickness = 1.6e-3
 z_dist = 5e-3
 
@@ -37,6 +43,8 @@ rms = [700e-9,700e-9,700e-9,120e-9,120e-9,120e-9]
 resolution = 6.25e-9
 
 num_iter_outer = 100
+# PARAMETER ENDE --------------------------------------
+
 
 progress_counter = 0
 total_runs = len(num_mag_sens)*num_iter_outer*len(platine_num_leiter)
@@ -61,7 +69,7 @@ for k in range(len(platine_num_leiter)):
 
             s = sf.CurrSensor(num_mag_sens[m], dist_sensors[m], platine_thickness, z_dist, p, shift[m])
 
-            kappa, var_x = sf.calc_condition(p.ltr_segs_arr, s.sens_arr, rms[m], resolution)
+            kappa, var_x = sf.calc_condition(p.ltr_segs_arr, s.sens_arr, rms[m])
 
             all_kappas[m].append(kappa)
             all_stds[m].extend(var_x.tolist())

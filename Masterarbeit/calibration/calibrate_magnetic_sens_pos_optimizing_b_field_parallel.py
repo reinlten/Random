@@ -138,48 +138,72 @@ def calc_B(magsens_pos, leiter_arr, curr_list):
 
 def process_sensor(sens_id, ltr_data, curr_list, mag_data, magsens_positions,
                    steps_xy, steps_z, offs_xy, offs_z):
-    """
-    Berechnet die Offsets für einen Sensor (alle 3 Achsen zusammen)
-    """
-    mag_sens_arr_ideal_ltr = []
-    mag_sens_arr_ideal_pos_ltr = []
-    mag_sens_arr_ideal_offs_ltr = []
+
+    base_pos = magsens_positions[sens_id]
+
+    # ---------- Offset Grid erzeugen ----------
+    offs_list = []
+
+    for k in range(steps_z):
+        for i in range(steps_xy):
+            for j in range(steps_xy):
+
+                offs = -np.array([offs_xy/2, offs_xy/2, offs_z/2]) + \
+                       np.array([
+                           offs_xy*i/(steps_xy-1),
+                           offs_xy*j/(steps_xy-1),
+                           offs_z*k/(steps_z-1)
+                       ])
+
+                offs_list.append(offs)
+
+    offs_list = np.array(offs_list)
+    n_grid = len(offs_list)
+
+    # ---------- Fehlersumme berechnen ----------
+    sum_diffs = np.zeros(n_grid)
 
     for h in range(len(ltr_data)):
-        mag_sens_arr_ideal = []
-        mag_sens_arr_ideal_offs = []
-        pos_cntr = 0
 
-        for k in range(steps_z):
-            for i in range(steps_xy):
-                for j in range(steps_xy):
-                    pos_cntr += 1
-                    offs = -np.array([offs_xy / 2, offs_xy / 2, offs_z / 2]) + \
-                           np.array(
-                               [offs_xy * i / (steps_xy - 1), offs_xy * j / (steps_xy - 1), offs_z * k / (steps_z - 1)])
-                    pos = magsens_positions[sens_id] + offs
-                    mag_sens_arr_ideal_offs.append(offs)
-                    mag_sens_arr_ideal.append(calc_B(pos, ltr_data[h], curr_list[h]))
+        meas = np.array(mag_data[h][sens_id])
 
-        mag_sens_arr_ideal_ltr.append(mag_sens_arr_ideal)
-        mag_sens_arr_ideal_offs_ltr.append(mag_sens_arr_ideal_offs)
+        for g, offs in enumerate(offs_list):
 
-    sum_best_diffs = np.array([0. for _ in range(len(np.array(mag_sens_arr_ideal_ltr[0])))])
-    all_best_diffs = []
+            pos = base_pos + offs
+            B = calc_B(pos, ltr_data[h], curr_list[h])
 
-    for k in range(len(mag_data)):
-        line = [mag_data[k][sens_id] for _ in range(len(np.array(mag_sens_arr_ideal_ltr[k])[:, 0]))]
-        abs_diff = np.sum(abs(np.array(mag_sens_arr_ideal_ltr[k]) - np.array(line)), axis=1)
-        all_best_diffs.append(abs_diff)
-        sum_best_diffs += abs_diff
+            sum_diffs[g] += np.sum(np.abs(B - meas))
 
-    min_idx = np.argmin(sum_best_diffs)
+    # ---------- globales Minimum ----------
+    min_idx = np.argmin(sum_diffs)
+    best_offs = offs_list[min_idx]
+    best_pos = base_pos + best_offs
+    Fmin = sum_diffs[min_idx]
 
-    result_str = (f"sens {sens_id}: diff = {sum_best_diffs[min_idx]} (="
-                  f"{all_best_diffs[0][min_idx]} + {all_best_diffs[1][min_idx]} + "
-                  f"{all_best_diffs[2][min_idx]}, @offs {mag_sens_arr_ideal_offs_ltr[0][min_idx]}")
+    # ---------- 95% Konfidenzregion ----------
+    threshold = Fmin + 7.81  # chi² für 3 Parameter
 
-    return (sens_id, mag_sens_arr_ideal_offs_ltr[0][min_idx].tolist(), result_str)
+    valid = sum_diffs <= threshold
+    valid_offs = offs_list[valid]
+
+    if len(valid_offs) > 1:
+        sigma = np.std(valid_offs, axis=0)
+        ci95 = 1.96 * sigma
+    else:
+        ci95 = np.array([0.,0.,0.])
+
+    # ---------- Ergebnisstring ----------
+    result_str = (
+        f"sens {sens_id}: "
+        f"pos = [{best_pos[0]*1e3:.3f}, {best_pos[1]*1e3:.3f}, {best_pos[2]*1e3:.3f}] mm "
+        f"± [{ci95[0]*1e3:.3f}, {ci95[1]*1e3:.3f}, {ci95[2]*1e3:.3f}] mm (95%)"
+    )
+
+    return (
+        sens_id,
+        best_offs.tolist(),
+        result_str
+    )
 
 
 # Hauptcode

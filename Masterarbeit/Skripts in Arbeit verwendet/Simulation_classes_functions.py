@@ -1,15 +1,17 @@
+# Dieses Skript enthält Hilfsklassen und Hilfsfunktionen für die
+# Simulation von Leitern und Magnetfeldsensoren.
+
 import random
 import numpy as np
-from typing import NamedTuple, List
-from numpy.linalg import svd, eigvals, norm
+from typing import List
+from numpy.linalg import svd
 
 
-# Leiter in x-y-Ebene
-# Sensoren um d in Richtung z versetzt.
+class Leiter:  # Leiterklasse; enthält Positionsdaten (Start- und
+#     Endpunkt) sowie ein Feld „curr“ mit dem Strom, der in einem
+#     Leiterobjekt fließt. Enthält Funktionen zur Rückgabe der
+#     Leiterlänge und zur Rückgabe der Position fürs plotten.
 
-
-
-class Leiter:
     def __init__(self, x1, y1, x2, y2, z, curr):
         self.x1 = x1
         self.y1 = y1
@@ -25,7 +27,11 @@ class Leiter:
         return [self.x1*1e3, self.x2*1e3], [self.y1*1e3, self.y2*1e3]
 
 
-class Platine:
+class Platine:  # Platinenklasse (DUT); enthält Platinen-
+#     dimensionen. Erzeugt zufällige Leiterobjekte (innerhalb
+#     der Platinendimensionen) und zugehörige Ströme.
+
+
     def __init__(self, dims, thickness, num_ltr_segs_range, num_ltr, max_curr, min_ltr_seg_len):
         self.length = dims[1]
         self.width = dims[0]
@@ -38,6 +44,28 @@ class Platine:
         self.curr_arr_mA = []
         self.max_curr = max_curr
         self.min_len = min_ltr_seg_len
+
+        def add_leiterliste_if_no_intersections(existing: List[Leiter], new_list: List[Leiter]) -> bool:
+
+            def ccw(A, B, C):
+                return (C[1] - A[1]) * (B[0] - A[0]) > (B[1] - A[1]) * (C[0] - A[0])
+
+            def segments_intersect(l1: Leiter, l2: Leiter) -> bool:
+
+                if l1.z != l2.z:
+                    return False  # Unterschiedliche Ebenen schneiden sich nicht
+
+                A, B = (l1.x1, l1.y1), (l1.x2, l1.y2)
+                C, D = (l2.x1, l2.y1), (l2.x2, l2.y2)
+
+                return (ccw(A, C, D) != ccw(B, C, D)) and (ccw(A, B, C) != ccw(A, B, D))
+
+            for l_new in new_list:
+                for l_old in existing:
+                    if segments_intersect(l_new, l_old):
+                        return False  # Schnittpunkt gefunden → nicht hinzufügen
+
+            return True
 
         for i in range(self.num_ltr):
             curr = random.uniform(-self.max_curr, self.max_curr)
@@ -91,30 +119,12 @@ class Platine:
         return [0, self.length*1e3, self.length*1e3, 0, 0], [0, 0, self.width*1e3, self.width*1e3,0]
 
 
-def ccw(A, B, C):
-    return (C[1] - A[1]) * (B[0] - A[0]) > (B[1] - A[1]) * (C[0] - A[0])
+class Magnetfeld_Sensor:  # Magnetfeldsensorklasse; enthält
+#     Positionsdaten sowie ein Feld „b_meas“ mit der (simulativ)
+#     gemessenen magnetischen Flussdichte. Enhält eine Funktion zur
+#     Berechnung der magnetischen Flussdichte anhand von Leiterob-
+#     jekten.
 
-
-def segments_intersect(l1: Leiter, l2: Leiter) -> bool:
-    if l1.z != l2.z:
-        return False  # Unterschiedliche Ebenen schneiden sich nicht
-
-    A, B = (l1.x1, l1.y1), (l1.x2, l1.y2)
-    C, D = (l2.x1, l2.y1), (l2.x2, l2.y2)
-
-    return (ccw(A, C, D) != ccw(B, C, D)) and (ccw(A, B, C) != ccw(A, B, D))
-
-
-def add_leiterliste_if_no_intersections(existing: List[Leiter], new_list: List[Leiter]) -> bool:
-    for l_new in new_list:
-        for l_old in existing:
-            if segments_intersect(l_new, l_old):
-                return False  # Schnittpunkt gefunden → nicht hinzufügen
-
-    return True
-
-
-class Magnetfeld_Sensor:
     def __init__(self, d, x, y):
         self.d = d
         self.x = x
@@ -125,47 +135,16 @@ class Magnetfeld_Sensor:
         B_ges = 0
         u0 = 4 * np.pi * 1e-7
         for l in leiter_arr:
-            B_ges += l.curr*calc_b_coeffs_new(l,self)
+            B_ges += l.curr*calc_b_coeffs(l,self)
 
         return B_ges
 
-def calc_b_coeffs(ltr, sens):
-    u0 = 4 * np.pi * 1e-7
-    a = np.array([ltr.x1, ltr.y1, ltr.z])
-    b = np.array([ltr.x2, ltr.y2, ltr.z])
-    s = np.array([sens.x, sens.y, sens.d])
 
-    vec_1 = b - a
-    vec_2 = s - a
-    L = np.linalg.norm(vec_1) / 2
+class CurrSensor:  # Sensorklasse; erzeugt Magnetfeld_Sensor-Ob-
+#     jekte nach Vorgabe (einseitig/doppelseitig/doppelseitig ver-
+#     setzt) und berechnet magnetische Flussdichten der Magnetfeld_
+#     Sensor-Objekte anhand eines Platinenobjekts.
 
-    cross = np.cross(vec_1, vec_2)
-    rho = np.linalg.norm(cross) / np.linalg.norm(vec_1)
-    m = (a + b) / 2
-    pseudo_z = np.dot((s - m),vec_1) / np.linalg.norm(vec_1)
-    e = cross / np.linalg.norm(cross)
-    b_init = u0 / (4 * np.pi * rho)
-    b_1 = (L + pseudo_z) / np.sqrt(rho ** 2 + (L + pseudo_z) ** 2)
-    b_2 = (L - pseudo_z) / np.sqrt(rho ** 2 + (L - pseudo_z) ** 2)
-    return b_init * (b_1 + b_2) * e
-
-def calc_b_coeffs_new(ltr, sens):
-    u0 = 4 * np.pi * 1e-7
-    a = np.array([ltr.x1, ltr.y1, ltr.z])
-    b = np.array([ltr.x2, ltr.y2, ltr.z])
-    s = np.array([sens.x, sens.y, sens.d])
-    u = b - a
-    v = s - a
-
-    cross = np.cross(u, v)
-
-    b_1 = np.dot(v,u)/np.linalg.norm(v)
-    b_2 = (np.linalg.norm(u)**2-np.dot(v,u))/np.linalg.norm(s-b)
-
-    return (u0/(4*np.pi))*(cross/(np.linalg.norm(cross))**2)*(b_1+b_2)
-
-
-class CurrSensor:
     def __init__(self, num_sens_mag, dist_sensors, platine_thickness, z_dist_platine, p, shift):
         self.num_sensors_x_up = num_sens_mag[0]
         self.num_sensors_y_up = num_sens_mag[1]
@@ -178,14 +157,6 @@ class CurrSensor:
         self.sens_arr = []
         self.p = p
         self.shift = shift
-
-        #     o      o
-        #--------------------------- | platine_thickness
-        #         o          |
-        #                    | z_dist_platine
-        #                    |
-        #---------------------------
-        #
 
         x_shift = 0
         y_shift = 0
@@ -201,6 +172,7 @@ class CurrSensor:
 
         for i in range(self.num_sensors_x_up):
             for j in range(self.num_sensors_y_up):
+                offs_x = random.uniform(-1e-3, 1e-3)
                 sens = Magnetfeld_Sensor(self.z_dist_platine+platine_thickness, pos_x_up + i * self.dist_sensors_x, pos_y_up + j * self.dist_sensors_y)
                 self.sens_arr.append(sens)
 
@@ -222,8 +194,100 @@ class CurrSensor:
         return np.array(scatter_arr)
 
 
+def calc_b_coeffs(ltr, sens):  # Funktion zur Berechnung der magnetischen
+#     Flussdichte eines Magnetfeld_Sensor-Objekts.
+#     Eingabe:
+#         ltr: Leiterobjekt.
+#         sens: Magnetfeld_Sensor-Objekt.
+#     Ausgabe:
+#         b_ges: magnetische Flussdichte bei der Position des Mag-
+#             netfeld_Sensor-Objekts.
 
-def calc_curr_segments(leiter_seg_arr, sens_arr, rms, resolution,alpha):
+    u0 = 4 * np.pi * 1e-7
+    a = np.array([ltr.x1, ltr.y1, ltr.z])
+    b = np.array([ltr.x2, ltr.y2, ltr.z])
+    s = np.array([sens.x, sens.y, sens.d])
+    u = b - a
+    v = s - a
+
+    cross = np.cross(u, v)
+
+    b_1 = np.dot(v,u)/np.linalg.norm(v)
+    b_2 = (np.linalg.norm(u)**2-np.dot(v,u))/np.linalg.norm(s-b)
+    b_ges = (u0/(4*np.pi))*(cross/(np.linalg.norm(cross))**2)*(b_1+b_2)
+
+    return b_ges
+
+
+def calc_condition(leiter_seg_arr, sens_arr, rms):  # Funktion zur Berechnung der Kondition und der
+#     Standardabweichung der Lösung des Problems.
+#     Eingabe:
+#         leiter_seg_arr: Liste mit Listen von (Zusammenhängenden)
+#             Leiterobjekten.
+#         sens_arr: Liste mit Magnetfeld_Sensor-Objekten.
+#         rms: RMSE-Rauschen der magnetischen Flussdichte lt.
+#             Datenblatt.
+#     Ausgabe:
+#         kappa_A: Kondition des Problems.
+#         std_x: Standardabweichung der Least-Squares Lösung.
+
+    A = None
+
+    for sens in sens_arr:
+        cols = []
+        for segs in leiter_seg_arr:
+            b_ges = 0
+            for l in segs:
+                b_ges += calc_b_coeffs(l, sens)
+
+            cols.append(b_ges)
+
+        if A is None:
+            A = np.array(cols).T
+        else:
+            A = np.vstack([A, np.array(cols).T])
+
+
+    U, s, Vt = svd(A, full_matrices=False)  # U: m x n, s: length n
+    sigma1 = s[0]
+    sigmamin = s[-1] if s.size > 0 else 0.0
+    kappa_A = np.inf if sigmamin <= 0 else float(sigma1 / sigmamin)
+
+    AtA_inv = np.linalg.inv(A.T @ A)
+    Cov_x = rms ** 2 * AtA_inv
+
+    std_x = np.sqrt(np.diag(Cov_x))*1000 # A -> mA
+
+    return kappa_A, std_x
+
+
+def calc_curr_segments(leiter_seg_arr, sens_arr, rms, resolution,pos_uncertainty):  # Funktion zur Berechnung von Strömen in
+#     Leiterbahnen durch Magnetfelddaten und Leiterpositionsdaten.
+#     Die Magnetfeld_Sensor-Objekte sollen dabei so realistisch wie
+#     möglich simuliert werden, weshalb Werte wie RMSE-Rauschen und
+#     Auflösung (aus einem Datenblatt) verwendet werden. Es wird ein
+#     lineares Gleichungssystem aufgestellt, welches per Least-
+#     Squares gelöst wird.
+#     Eingabe:
+#         leiter_seg_arr: Liste mit Listen von (zusammenhängenden)
+#             Leiterobjekten
+#         sens_arr: Liste mit Magnetfeld_Sensor-Objekten
+#         rms: RMSE-Rauschen der magnetischen Flussdichte lt.
+#             Datenblatt.
+#         resolution: Auflösung des Magnetfeldsensors lt. Daten-blatt
+#         pos_uncertainty: Unsicherheit der Position der Magnet-feld_
+#         Sensor-Objekte.
+#     Ausgabe:
+#         currs*1000: Ströme der Leiterobjekte in mA.
+
+
+    def get_noise(N, desired_rms):
+        noise = np.random.randn(N)
+        current_rms = np.sqrt(np.mean(noise ** 2))
+        noise = noise * (desired_rms / current_rms)
+
+        return noise
+
     A = None
     b_vec_arr = []
 
@@ -242,7 +306,11 @@ def calc_curr_segments(leiter_seg_arr, sens_arr, rms, resolution,alpha):
         for segs in leiter_seg_arr:
             b_ges = 0
             for l in segs:
-                b_ges += calc_b_coeffs_new(l,sens)
+                temp_sens = Magnetfeld_Sensor(sens.d, sens.x, sens.y)
+                temp_sens.x += random.uniform(-pos_uncertainty,pos_uncertainty)
+                temp_sens.y += random.uniform(-pos_uncertainty, pos_uncertainty)
+                temp_sens.d += random.uniform(-pos_uncertainty, pos_uncertainty)
+                b_ges += calc_b_coeffs(l,temp_sens)
 
             cols.append(b_ges)
 
@@ -253,80 +321,55 @@ def calc_curr_segments(leiter_seg_arr, sens_arr, rms, resolution,alpha):
 
     b = np.array(b_vec_arr).flatten()
 
-    #print(A)
+    currs, residuals, rank, s = np.linalg.lstsq(A, b, rcond=None)
 
-    #print(b)
-
-    k = 10
-
-    A = np.tile(A, (k, 1))  # A k-mal untereinander anhängen
-    b = np.tile(b, k)
-
-    U, s, Vt = svd(A, full_matrices=False)  # U: m x n, s: length n
-    sigma1 = s[0]
-    sigmamin = s[-1] if s.size > 0 else 0.0
-    kappa_A = np.inf if sigmamin <= 0 else float(sigma1 / sigmamin)
-
-    AtA_inv = np.linalg.inv(A.T @ A)
-    Cov_x = rms ** 2 * AtA_inv
-
-    std_x = np.sqrt(np.diag(Cov_x))
-    print(f"std:{std_x*1000}")
-
-    #A_aug = np.vstack([A, np.sqrt(alpha) * np.eye(A.shape[1])])
-    #b_aug = np.concatenate([b, np.zeros(A.shape[1])])
-
-    x, residuals, rank, s = np.linalg.lstsq(A, b, rcond=None)
-
-    return x  #, kappa_A
+    return currs*1000
 
 
-def get_noise(N, desired_rms):
-    noise = np.random.randn(N)
-    current_rms = np.sqrt(np.mean(noise ** 2))
-    noise = noise * (desired_rms / current_rms)
-
-    return noise
-
-
-def random_leiter_vars(a, b):
-    vars = []
-    for i in range(4):
-        vars.append(random.uniform(a, b))
-    return vars
-
-
-def next_segment_vars_by_choice(last_choice, max_x, max_y, min_x, min_y, last_x, last_y):
-    dist_from_right_edge = max_x - last_x
-    dist_from_left_edge = last_x - min_x
-    dist_from_upper_edge = max_y - last_y
-    dist_from_lower_edge = last_y - min_y
-
-    if last_choice == 0:
-        return random.uniform(last_x, max_x), last_y
-    if last_choice == 1:
-        return_val = min(random.uniform(0, dist_from_right_edge), random.uniform(0, dist_from_upper_edge))
-        return last_x + return_val, last_y + return_val
-    if last_choice == 2:
-        return last_x, random.uniform(last_y, max_y)
-    if last_choice == 3:
-        return_val = min(random.uniform(0, dist_from_left_edge), random.uniform(0, dist_from_upper_edge))
-        return last_x - return_val, last_y + return_val
-    if last_choice == 4:
-        return random.uniform(min_x, last_x), last_y
-    if last_choice == 5:
-        return_val = min(random.uniform(0, dist_from_left_edge), random.uniform(0, dist_from_lower_edge))
-        return last_x - return_val, last_y - return_val
-    if last_choice == 6:
-        return last_x, random.uniform(min_y, last_y)
-    if last_choice == 7:
-        return_val = min(random.uniform(0, dist_from_right_edge), random.uniform(0, dist_from_lower_edge))
-        return last_x + return_val, last_y - return_val
-
-    return -1
+def random_leiter_segments(curr, N, max_x, max_y, min_x, min_y, z):  # Funktion zum Erzeugen einer
+#     zusammenhängenden Kette aus Leiterobjekten.
+#     Eingabe:
+#         curr: Strom der Leiterobjekte
+#         N: Anzahl der Leiterobjekte in der Kette
+#         max_x, max_y, min_x, min_y: Begrenzungen für die Leiter-
+#             objekte
+#         z: z-Höhe der Leiterobjekte
+#     Ausgabe:
+#         leiter_arr: Liste von Leiterobjekten, die denselben Strom
+#             führen. Der Endpunkt eines Leiterobjekts ist der
+#             Startpunkt des nächsten Leiterobjekts.
 
 
-def random_leiter_segments(curr, N, max_x, max_y, min_x, min_y, z):
+    def next_segment_vars_by_choice(last_choice, max_x, max_y, min_x, min_y, last_x, last_y):
+        dist_from_right_edge = max_x - last_x
+        dist_from_left_edge = last_x - min_x
+        dist_from_upper_edge = max_y - last_y
+        dist_from_lower_edge = last_y - min_y
+
+        if last_choice == 0:
+            return random.uniform(last_x, max_x), last_y
+        if last_choice == 1:
+            return_val = min(random.uniform(0, dist_from_right_edge), random.uniform(0, dist_from_upper_edge))
+            return last_x + return_val, last_y + return_val
+        if last_choice == 2:
+            return last_x, random.uniform(last_y, max_y)
+        if last_choice == 3:
+            return_val = min(random.uniform(0, dist_from_left_edge), random.uniform(0, dist_from_upper_edge))
+            return last_x - return_val, last_y + return_val
+        if last_choice == 4:
+            return random.uniform(min_x, last_x), last_y
+        if last_choice == 5:
+            return_val = min(random.uniform(0, dist_from_left_edge), random.uniform(0, dist_from_lower_edge))
+            return last_x - return_val, last_y - return_val
+        if last_choice == 6:
+            return last_x, random.uniform(min_y, last_y)
+        if last_choice == 7:
+            return_val = min(random.uniform(0, dist_from_right_edge), random.uniform(0, dist_from_lower_edge))
+            return last_x + return_val, last_y - return_val
+
+        return -1
+
+
     leiter_arr = []
     choices = ['right', 'down', 'left', 'up', 'upright', 'downright', 'upleft', 'downleft']
     last_x = random.uniform(min_x, max_x)
@@ -344,64 +387,4 @@ def random_leiter_segments(curr, N, max_x, max_y, min_x, min_y, z):
 
     return leiter_arr
 
-
-def overdetermined_row_diagnostics(A, eps=1e-16, compute_full_row_gram=True):
-    """
-    A: m x n with m > n (overdetermined)
-    Returns key diagnostics about conditioning and row redundancy.
-    If compute_full_row_gram is False and m is large, mutual coherence uses a memory-friendly method.
-    """
-    m, n = A.shape
-    # SVD (economy)
-    U, s, Vt = svd(A, full_matrices=False)   # U: m x n, s: length n
-    sigma1 = s[0]
-    sigmamin = s[-1] if s.size>0 else 0.0
-    kappa_A = np.inf if sigmamin <= 0 else float(sigma1 / sigmamin)
-    # effective rank (entropy)
-    ps = s / (s.sum() + eps)
-    r_eff = float(np.exp(-np.sum(ps * np.log(ps + eps))))
-    # column-gram (n x n) eigenvalues (efficient)
-    # eigenvalues of A^T A are s**2
-    eigvals_AtA = s**2
-    # Leverage scores (rows)
-    leverages = np.sum(U**2, axis=1)  # length m, sum ~ rank n
-
-    # Mutual coherence of rows:
-    row_norms = np.linalg.norm(A, axis=1)
-    nonzero = row_norms > 0
-    if compute_full_row_gram and m <= 2000:
-        # safe to compute full m x m Gram
-        An = (A[nonzero].T / row_norms[nonzero]).T
-        C = An @ An.T
-        np.fill_diagonal(C, 0.0)
-        mu = float(np.max(np.abs(C))) if C.size>0 else 0.0
-        off_energy = norm((A @ A.T) - np.diag(np.diag(A @ A.T)), 'fro') / (norm(np.diag(np.diag(A @ A.T)), 'fro') + eps)
-    else:
-        # memory-friendly approximate mutual coherence: sample pairs
-        nn = nonzero.sum()
-        if nn <= 1:
-            mu = 0.0
-            off_energy = 0.0
-        else:
-            # sample up to S random pairs
-            S = min(200000, nn*(nn-1)//2)
-            # uniformly sample pairs
-            i = np.random.randint(0, nn, size=S)
-            j = np.random.randint(0, nn, size=S)
-            mask = i != j
-            i = i[mask]; j = j[mask]
-            ai = A[nonzero][i] / (row_norms[nonzero][i][:,None] + eps)
-            aj = A[nonzero][j] / (row_norms[nonzero][j][:,None] + eps)
-            dots = np.abs(np.sum(ai * aj, axis=1))
-            mu = float(np.max(dots)) if dots.size>0 else 0.0
-            # approximate off-diagonal energy via sample variance of dot-products
-            off_energy = float(np.mean(dots))  # rough proxy (0..1)
-
-    #print(f'singular_values {s}')
-    print(f'kappa_A {kappa_A}')
-    #print(f'effective_rank {r_eff}')
-    #print(f'eigvals_AtA {eigvals_AtA}')
-    #print(f'leverage_scores {leverages}')
-    #print(f'mutual_coherence_rows_est {mu}')
-    #print(f'off_diag_energy_rows_est {off_energy}')
 

@@ -201,6 +201,7 @@ class CurrSensor:
 
         for i in range(self.num_sensors_x_up):
             for j in range(self.num_sensors_y_up):
+                offs_x = random.uniform(-1e-3, 1e-3)
                 sens = Magnetfeld_Sensor(self.z_dist_platine+platine_thickness, pos_x_up + i * self.dist_sensors_x, pos_y_up + j * self.dist_sensors_y)
                 self.sens_arr.append(sens)
 
@@ -252,7 +253,7 @@ def calc_condition(leiter_seg_arr, sens_arr, rms, resolution):
     return kappa_A, std_x
 
 
-def calc_curr_segments(leiter_seg_arr, sens_arr, rms, resolution,alpha):
+def calc_curr_segments(leiter_seg_arr, sens_arr, rms, resolution,pos_uncertainty):
     A = None
     b_vec_arr = []
 
@@ -271,7 +272,11 @@ def calc_curr_segments(leiter_seg_arr, sens_arr, rms, resolution,alpha):
         for segs in leiter_seg_arr:
             b_ges = 0
             for l in segs:
-                b_ges += calc_b_coeffs_new(l,sens)
+                temp_sens = Magnetfeld_Sensor(sens.d, sens.x, sens.y)
+                temp_sens.x += random.uniform(-pos_uncertainty,pos_uncertainty)
+                temp_sens.y += random.uniform(-pos_uncertainty, pos_uncertainty)
+                temp_sens.d += random.uniform(-pos_uncertainty, pos_uncertainty)
+                b_ges += calc_b_coeffs_new(l,temp_sens)
 
             cols.append(b_ges)
 

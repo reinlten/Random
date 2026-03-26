@@ -1,5 +1,7 @@
-import locale
+# Skript für die Simulation von Leiterbahnen und Magnetfeldsensoren.
+# Wird in Bild 3-1 angewendet.
 
+import locale
 import numpy as np
 from matplotlib import pyplot as plt
 import matplotlib as mpl
@@ -19,10 +21,12 @@ plt.rcParams.update({
 locale.setlocale(locale.LC_NUMERIC, "de_DE.UTF-8")
 mpl.rcParams['axes.formatter.use_locale'] = True
 
+
+# PARAMETER START ------------------------------------
 platine_thickness = 1.6e-3
 z_dist = 5e-3
 
-max_curr = 50e-3  # A
+max_curr = 50e-3  # Ap
 min_ltr_seg_len = 4e-3
 
 platine_dims = [[24e-3,36e-3]]  # width, length;
@@ -39,6 +43,7 @@ resolution = 6.25e-9
 num_iter_inner = 1
 num_iter_outer = 1
 
+# PARAMETER ENDE --------------------------------------
 progress_counter = 0
 total_runs = len(platine_dims)*len(num_mag_sens)*num_iter_outer*len(platine_num_leiter[0])
 
