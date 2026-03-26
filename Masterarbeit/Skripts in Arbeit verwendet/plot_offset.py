@@ -1,7 +1,15 @@
-# Dieses Skript plottet nichtkalibrierte und kalibrierte Magnetfeld-
+# Dieses Skript plottet nichtkalibrierte und kalibrierte Magnet-feld-
 # sensorpositionen.
 # Wird für Bild 5-11 verwendet.
-
+# Eingabe:
+#      offset [LIST][LIST][FLOAT]: Liste mit kalibrierten Offsets
+#          der Magnetfeldsensoren (siehe Ausgabe von calibrate_mag-
+#          netic_sens_pos_optimizing_b_field_parallel.py)
+#      magsens_positions [LIST][LIST][FLOAT]: Schätzung der Positi-o-
+#          nen der Magnetfeldsensoren.
+# Ausgabe:
+#      Plots zu den geschätzten bzw. kalibrierten Magnetfeldsensor-
+#      positionen.
 
 import locale
 import matplotlib as mpl

@@ -1,7 +1,13 @@
 # Mit diesem Skript werden die Messungen ausgewertet bzw. die
 # Tabellen aus Abschnitt 6 erzeugt.
-
-
+# Protokolle mit KI im Ordner „meas_eval_log“.
+# Eingabe:
+#     folder_path [STRING]: Pfad zum Ordner mit den zu betrachten-den
+#         Messungen.
+#     confidence [FLOAT]: Konfidenzniveau, auf dessen Grundlage die
+#         Messunsicherheit berechnet wird.
+# Ausgabe:
+#     .csv-Datei mit den Ergebnissen der Auswertung.
 
 import os
 import numpy as np
